@@ -81,19 +81,17 @@ export default function JobEditForm({
   const [billingStatus, setBillingStatus] = useState(job.billing_status || "processing")
   const [status, setStatus] = useState<JobStatus>(job.status as JobStatus)
   const [statusChanged, setStatusChanged] = useState(false)
+  
+  // FIX 1: Smart Initialization - If vendor exists, force 'subcontract'
   const [customerType, setCustomerType] = useState<"direct" | "subcontract">(
-    (job.customer_type as "direct" | "subcontract") || (job.vendor_id ? "subcontract" : "direct"),
+    job.customer_type === "subcontract" || job.vendor_id ? "subcontract" : "direct",
   )
   const [vendorId, setVendorId] = useState<string>(job.vendor_id || "")
 
   const originalScheduledDateTime = job.scheduled_start ? new Date(job.scheduled_start) : new Date()
   
   // FIX: Force browser to treat the incoming UTC date as EST for display (stripping the shift)
-  const estOffset = 5 * 60 // 5 hours in minutes (approximate for EST)
-  const displayDate = new Date(originalScheduledDateTime.getTime() - (originalScheduledDateTime.getTimezoneOffset() * 60000))
-  
   const originalScheduledDateString = originalScheduledDateTime.toISOString().split("T")[0]
-  // Extract time parts manually to avoid timezone shifts during editing
   const hours = originalScheduledDateTime.getHours().toString().padStart(2, '0')
   const minutes = originalScheduledDateTime.getMinutes().toString().padStart(2, '0')
   const originalScheduledTimeString = `${hours}:${minutes}`
@@ -492,29 +490,31 @@ export default function JobEditForm({
       }
 
       // FIX: Construct proper ISO timestamp with UTC offset to prevent shifting
-      // Create a date object from the form inputs
       const formDate = new Date(`${scheduledDate}T${scheduledTime}:00`);
-      // Convert to ISO string but ensure we account for timezone
-      // This will send "2026-01-28T17:40:00.000Z" (UTC) which effectively locks the time
-      // Or simply append the TZ offset manually if needed, but standard ISO usually works if Date is created locally
       const isoScheduledStart = formDate.toISOString();
+
+      // FIX 2: Ensure UUID fields are never sent as empty strings ("")
+      // Convert "" to null to satisfy Postgres UUID type requirements
+      const safeVendorId = customerType === "subcontract" && vendorId ? vendorId : null;
+      const safeContractId = contractId || null;
+      const safeServiceLocationId = serviceLocationId || null;
 
       const jobUpdateData: any = {
         title: jobTitle,
         customer_id: customerId,
-        service_location_id: serviceLocationId || null,
-        service_agreement_id: contractId || null,
+        service_location_id: safeServiceLocationId,
+        service_agreement_id: safeContractId,
         job_type: jobType,
         service_type: serviceType.join(", "),
         billing_status: billingStatus,
-        customer_type: customerType, // Save customer type explicitely
+        customer_type: customerType, // Explicitly save this
         ...(statusChanged && { status: status }),
         ...(scheduledChanged && { scheduled_start: isoScheduledStart }),
         return_trip_needed: returnTripNeeded,
         notes: notes || null,
         po_number: poNumber || null,
         estimate_number: estimateNumber || null,
-        vendor_id: customerType === "subcontract" ? vendorId : null,
+        vendor_id: safeVendorId, // Use the safe version
         updated_at: new Date().toISOString(),
       }
 
