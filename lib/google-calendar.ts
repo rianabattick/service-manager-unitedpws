@@ -40,6 +40,73 @@ async function getAccessToken(): Promise<string | null> {
   }
 }
 
+// Helper to build the Rich Description string
+function buildEventDescription(job: any, equipmentList: any[], contacts: any[]) {
+  const separator = "___________________"
+  
+  let d = `JOB OVERVIEW\n${separator}\n\n`
+  d += `Job Number: ${job.job_number}\n`
+  d += `Company: ${job.customer_name || "N/A"}\n`
+  if (job.customer_type) d += `Customer Type: ${job.customer_type}\n`
+  
+  d += `\nSERVICE DETAILS\n${separator}\n\n`
+  if (job.service_type) d += `Service Type: ${job.service_type}\n`
+  d += `Status: ${job.status}\n` // Status included here
+  if (job.job_type) d += `Job Type: ${job.job_type}\n`
+  d += `Is Return Trip: ${job.return_trip_needed ? "Yes" : "No"}\n`
+
+  d += `\nLOCATION\n${separator}\n\n`
+  if (job.site_locations?.length) {
+    job.site_locations.forEach((site: any) => {
+      d += `${site.service_location_name || "Unknown Site"}\n`
+      let addr = site.service_location_address || ""
+      if (site.service_location_city) addr += `, ${site.service_location_city}`
+      if (site.service_location_state) addr += `, ${site.service_location_state}`
+      if (site.service_location_zip_code) addr += ` ${site.service_location_zip_code}`
+      if (addr) d += `${addr}\n`
+      if (site.site_notes) d += `Notes: ${site.site_notes}\n`
+      d += `\n`
+    })
+  }
+
+  // Renamed EQUIPMENT -> UNITS
+  if (equipmentList.length > 0) {
+    d += `UNITS\n${separator}\n\n`
+    equipmentList.forEach((eq: any) => {
+      d += `• ${eq.equipment_name || "Unknown Unit"}`
+      if (eq.serial_number) d += ` (SN#: ${eq.serial_number})`
+      
+      // Added Site Name under the unit line
+      const siteName = eq.site_name || eq.site_location_name
+      if (siteName) {
+        d += ` Site: ${siteName}`
+      }
+      d += `\n`
+      
+      if (eq.unit_notes) d += `  Notes: ${eq.unit_notes}\n`
+      d += `\n`
+    })
+  }
+
+  if (contacts && contacts.length > 0) {
+    d += `POINT(S) OF CONTACT\n${separator}\n\n`
+    contacts.forEach((c: any) => {
+      d += `• ${c.first_name} ${c.last_name}\n`
+      if (c.phone) d += `  Phone: ${c.phone}\n`
+      if (c.email) d += `  Email: ${c.email}\n`
+      d += `\n`
+    })
+  }
+
+  if (job.internal_notes) {
+    d += `NOTES\n${separator}\n\n${job.internal_notes}\n`
+  }
+
+  d += `\nScheduled by: schedule@unitedpws.com`
+  
+  return d
+}
+
 export async function createCalendarInviteForJob(jobId: string, technicianIds: string[]): Promise<CalendarResult> {
   console.log("[v0] createCalendarInviteForJob called", { jobId, technicianIds })
 
@@ -51,13 +118,12 @@ export async function createCalendarInviteForJob(jobId: string, technicianIds: s
     const currentUser = await getCurrentUser()
     if (!currentUser?.organization_id) return { success: false, error: "Unable to determine organization" }
 
-    // 1. Get the data correctly
     const jobData = await getJobDetail(jobId, currentUser.organization_id)
     if (!jobData || !jobData.job) return { success: false, error: "Job not found" }
 
-    // 2. Extract the parts (This fixes the 'undefined' issue)
     const job = jobData.job
-    const equipmentList = jobData.units || [] // Your DB calls them 'units', not 'equipment'
+    const equipmentList = jobData.units || []
+    const contacts = jobData.contacts || []
 
     const accessToken = await getAccessToken()
     if (!accessToken) return { success: false, error: "Failed to generate Google Access Token" }
@@ -73,6 +139,9 @@ export async function createCalendarInviteForJob(jobId: string, technicianIds: s
 
     const results: Record<string, any> = {}
 
+    // Build the Rich Description ONCE
+    const description = buildEventDescription(job, equipmentList, contacts)
+
     for (const tech of technicians) {
       if (!tech.email) {
         results[tech.id] = { success: false, error: "No email for technician" }
@@ -80,56 +149,18 @@ export async function createCalendarInviteForJob(jobId: string, technicianIds: s
       }
 
       try {
-        let description = `Job: ${job.title || "Untitled Job"}\n`
-        description += `Job Number: ${job.job_number}\n`
-        description += `Customer: ${job.customer_name || "N/A"}\n`
-
-        // SITES: Restored full address formatting
-        if (job.site_locations?.length) {
-          description += `\nSites:\n`
-          job.site_locations.forEach((site: any) => {
-            description += `- ${site.service_location_name || "Unknown Site"}\n`
-            
-            let addr = site.service_location_address || ""
-            if (site.service_location_city) addr += `, ${site.service_location_city}`
-            if (site.service_location_state) addr += `, ${site.service_location_state}`
-            if (site.service_location_zip_code) addr += ` ${site.service_location_zip_code}`
-            
-            if (addr) description += `  ${addr}\n`
-            if (site.site_notes) description += `  Notes: ${site.site_notes}\n`
-          })
-        }
-
-        // EQUIPMENT: Restored Notes and Serial Number checks
-        if (equipmentList.length > 0) {
-          description += `\nEquipment:\n`
-          equipmentList.forEach((eq: any) => {
-            description += `- ${eq.equipment_name || "Unknown Equipment"}`
-            // DB returns 'serial_number' (not equipment_serial_number)
-            if (eq.serial_number) description += ` (S/N: ${eq.serial_number})`
-            description += `\n`
-            if (eq.unit_notes) description += `  Notes: ${eq.unit_notes}\n`
-          })
-        }
-
-        if (job.internal_notes) description += `\nInternal Notes: ${job.internal_notes}\n`
-        description += `\nScheduled by: schedule@unitedpws.com`
-
-        // TIME: Fixed the "Time Range Empty" crash
         const startDate = job.scheduled_start ? new Date(job.scheduled_start) : new Date()
         let endDate: Date
         if (job.scheduled_end) {
           endDate = new Date(job.scheduled_end)
-          if (endDate.getTime() <= startDate.getTime()) {
-             endDate = new Date(startDate.getTime() + 60 * 60 * 1000)
-          }
+          if (endDate.getTime() <= startDate.getTime()) endDate = new Date(startDate.getTime() + 60 * 60 * 1000)
         } else {
           endDate = new Date(startDate.getTime() + 60 * 60 * 1000)
         }
 
         const eventPayload = {
           summary: `${job.job_number}: ${job.title || "Job"}`,
-          description,
+          description, // Using the rich description
           start: { dateTime: startDate.toISOString(), timeZone: "America/New_York" },
           end: { dateTime: endDate.toISOString(), timeZone: "America/New_York" },
           iCalUID: `job-${jobId}-tech-${tech.id}@unitedpws.com`,
@@ -193,7 +224,6 @@ export async function updateCalendarInviteForJob(jobId: string, newTechnicianIds
     const accessToken = await getAccessToken()
     if (!accessToken) return { success: false, error: "Failed token" }
 
-    // Remove old events
     for (const techId of techsToRemove) {
       const tech = existingTechs?.find((t) => t.technician_id === techId)
       if (tech?.google_event_id && tech?.google_calendar_id) {
@@ -207,48 +237,21 @@ export async function updateCalendarInviteForJob(jobId: string, newTechnicianIds
       }
     }
 
-    // Update existing events
     const currentUser = await getCurrentUser()
     if (currentUser?.organization_id) {
        const jobData = await getJobDetail(jobId, currentUser.organization_id)
        if (jobData?.job) {
           const job = jobData.job
           const equipmentList = jobData.units || []
+          const contacts = jobData.contacts || []
           
+          // Build the Rich Description ONCE
+          const description = buildEventDescription(job, equipmentList, contacts)
+
           for (const techId of techsToUpdate) {
             const tech = existingTechs?.find((t) => t.technician_id === techId)
             if (tech?.google_event_id && tech?.google_calendar_id) {
                try {
-                  let description = `Job: ${job.title || "Untitled Job"}\n`
-                  description += `Job Number: ${job.job_number}\n`
-                  description += `Customer: ${job.customer_name || "N/A"}\n`
-
-                  if (job.site_locations?.length) {
-                    description += `\nSites:\n`
-                    job.site_locations.forEach((site: any) => {
-                      description += `- ${site.service_location_name || "Unknown Site"}\n`
-                      let addr = site.service_location_address || ""
-                      if (site.service_location_city) addr += `, ${site.service_location_city}`
-                      if (site.service_location_state) addr += `, ${site.service_location_state}`
-                      if (site.service_location_zip_code) addr += ` ${site.service_location_zip_code}`
-                      if (addr) description += `  ${addr}\n`
-                      if (site.site_notes) description += `  Notes: ${site.site_notes}\n`
-                    })
-                  }
-
-                  if (equipmentList.length > 0) {
-                    description += `\nEquipment:\n`
-                    equipmentList.forEach((eq: any) => {
-                      description += `- ${eq.equipment_name || "Unknown Equipment"}`
-                      if (eq.serial_number) description += ` (S/N: ${eq.serial_number})`
-                      description += `\n`
-                      if (eq.unit_notes) description += `  Notes: ${eq.unit_notes}\n`
-                    })
-                  }
-                  
-                  if (job.internal_notes) description += `\nInternal Notes: ${job.internal_notes}\n`
-                  description += `\nScheduled by: schedule@unitedpws.com`
-
                   const startDate = job.scheduled_start ? new Date(job.scheduled_start) : new Date()
                   let endDate: Date
                   if (job.scheduled_end) {
