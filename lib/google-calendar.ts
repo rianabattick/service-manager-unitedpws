@@ -10,6 +10,46 @@ interface CalendarResult {
 }
 
 /**
+ * Helper: Exchange the permanent Refresh Token for a temporary Access Token
+ * This fixes the 401 Unauthorized error.
+ */
+async function getAccessToken(): Promise<string | null> {
+  const refreshToken = process.env.GOOGLE_REFRESH_TOKEN
+  const clientId = process.env.GOOGLE_CLIENT_ID
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET
+
+  if (!refreshToken || !clientId || !clientSecret) {
+    console.error("[v0] Missing Google OAuth credentials in environment variables")
+    return null
+  }
+
+  try {
+    const response = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        refresh_token: refreshToken,
+        grant_type: "refresh_token",
+      }),
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      console.error("[v0] Failed to refresh access token:", data)
+      return null
+    }
+
+    return data.access_token // This is the short-lived token we need!
+  } catch (error) {
+    console.error("[v0] Error refreshing access token:", error)
+    return null
+  }
+}
+
+/**
  * Create Google Calendar events for a job
  * Creates one event per technician on their individual calendar
  */
@@ -32,10 +72,10 @@ export async function createCalendarInviteForJob(jobId: string, technicianIds: s
       return { success: false, error: "Job not found" }
     }
 
-    // Get Google API credentials
-    const accessToken = process.env.GOOGLE_API_KEY || process.env.GOOGLE_REFRESH_TOKEN
+    // FIX: Get a fresh Access Token using the Refresh Token
+    const accessToken = await getAccessToken()
     if (!accessToken) {
-      return { success: false, error: "Google Calendar API credentials not configured" }
+      return { success: false, error: "Failed to generate Google Access Token" }
     }
 
     const supabase = await createClient()
@@ -140,7 +180,7 @@ export async function createCalendarInviteForJob(jobId: string, technicianIds: s
           {
             method: "POST",
             headers: {
-              Authorization: `Bearer ${accessToken}`,
+              Authorization: `Bearer ${accessToken}`, // FIX: Using the fresh access token
               "Content-Type": "application/json",
             },
             body: JSON.stringify(eventPayload),
@@ -244,9 +284,10 @@ export async function updateCalendarInviteForJob(jobId: string, newTechnicianIds
       techsToUpdate: techsToUpdate.length,
     })
 
-    const accessToken = process.env.GOOGLE_API_KEY || process.env.GOOGLE_REFRESH_TOKEN
+    // FIX: Get a fresh Access Token using the Refresh Token
+    const accessToken = await getAccessToken()
     if (!accessToken) {
-      return { success: false, error: "Google Calendar API credentials not configured" }
+      return { success: false, error: "Failed to generate Google Access Token" }
     }
 
     // Delete events for removed technicians
@@ -262,7 +303,7 @@ export async function updateCalendarInviteForJob(jobId: string, newTechnicianIds
             {
               method: "DELETE",
               headers: {
-                Authorization: `Bearer ${accessToken}`,
+                Authorization: `Bearer ${accessToken}`, // FIX: Using the fresh access token
               },
             },
           )
@@ -354,7 +395,7 @@ export async function updateCalendarInviteForJob(jobId: string, newTechnicianIds
             {
               method: "PATCH",
               headers: {
-                Authorization: `Bearer ${accessToken}`,
+                Authorization: `Bearer ${accessToken}`, // FIX: Using the fresh access token
                 "Content-Type": "application/json",
               },
               body: JSON.stringify(eventPayload),
