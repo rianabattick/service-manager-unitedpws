@@ -1,6 +1,6 @@
 "use server"
 
-import { createAdminClient } from "./supabase.server"
+import { createAdminClient } from "./supabase-server"
 
 export interface CreateNotificationParams {
   organizationId: string

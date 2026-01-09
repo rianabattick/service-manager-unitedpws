@@ -1,6 +1,6 @@
 "use server"
 
-import { createClient, createAdminClient } from "./supabase.server"
+import { createClient, createAdminClient } from "./supabase-server"
 import { createNotifications, getManagerUserIds } from "./notifications"
 
 export interface Contract {

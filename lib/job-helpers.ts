@@ -1,6 +1,6 @@
 "use server"
 
-import { createClient } from "./supabase.server"
+import { createClient } from "./supabase-server"
 import { createNotifications, getManagerUserIds } from "./notifications"
 
 /**
