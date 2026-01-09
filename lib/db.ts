@@ -636,6 +636,9 @@ export async function listManagerJobsLite(params: {
 /**
  * Get complete job detail with all related data
  */
+/**
+ * Get complete job detail with all related data
+ */
 export async function getJobDetail(jobId: string, organizationId: string): Promise<JobDetail | null> {
   const supabase = await createClient()
 
@@ -709,7 +712,7 @@ export async function getJobDetail(jobId: string, organizationId: string): Promi
     const result = {
       service_location_id: jsl.service_location_id,
       site_location_id: jsl.site_location_id,
-      site_notes: jsl.site_notes || null, // Include site_notes from job_service_locations
+      site_notes: jsl.site_notes || null,
       service_location_name: jsl.service_location?.name || null,
       service_location_address: jsl.service_location?.address || null,
       service_location_address_line_2: jsl.service_location?.address_line_2 || null,
@@ -736,8 +739,6 @@ export async function getJobDetail(jobId: string, organizationId: string): Promi
     return result
   })
 
-  console.log("[v0] enrichedServiceLocations:", JSON.stringify(enrichedServiceLocations, null, 2))
-
   const { data: jobTechs, error: techError } = await supabase
     .from("job_technicians")
     .select(`
@@ -760,7 +761,7 @@ export async function getJobDetail(jobId: string, organizationId: string): Promi
     full_name: jt.technician?.full_name || null,
     email: jt.technician?.email || null,
     status: jt.status as JobTechnicianStatus,
-    is_lead: jt.is_lead || false, // Include is_lead field
+    is_lead: jt.is_lead || false,
   }))
 
   const { data: jobEquipment, error: equipError } = await supabase
@@ -794,7 +795,6 @@ export async function getJobDetail(jobId: string, organizationId: string): Promi
     console.error("[v0] Error fetching job equipment:", equipError)
   }
 
-  // Get all attachments for this job
   const { data: attachments, error: attachError } = await supabase
     .from("job_attachments")
     .select("equipment_id, type")
@@ -821,7 +821,7 @@ export async function getJobDetail(jobId: string, organizationId: string): Promi
       site_location_id: je.site_location_id || null,
       site_name: je.service_location?.name || null,
       site_location_name: je.site_location?.name || null,
-      unit_notes: je.unit_notes || null, // Include unit_notes from job_equipment
+      unit_notes: je.unit_notes || null,
     }
   })
 
@@ -862,8 +862,8 @@ export async function getJobDetail(jobId: string, organizationId: string): Promi
     service_location_state: jsl.service_location_state,
     service_location_zip_code: jsl.service_location_zip_code,
     site_location_id: jsl.site_location_id,
-    site_location: jsl.site_location, // Properly mapped from JOIN
-    site_notes: jsl.site_notes, // Include site_notes in display
+    site_location: jsl.site_location,
+    site_notes: jsl.site_notes,
   }))
 
   return {
@@ -878,13 +878,20 @@ export async function getJobDetail(jobId: string, organizationId: string): Promi
       return_trip_needed: job.return_trip_needed || false,
       notes: job.notes || null,
       service_agreement_number: job.service_agreement?.agreement_number || null,
-      service_agreement_title: job.service_agreement?.name || null, // Added service_agreement_title to the return object
-      customer_type: job.customer?.customer_type || null,
+      service_agreement_title: job.service_agreement?.name || null,
+      
+      // --- THIS IS THE FIX ---
+      // 1. Use the Job's type if set
+      // 2. If not, use the Customer's type
+      // 3. If a Vendor ID exists, default to 'subcontract'
+      // 4. Otherwise, 'direct'
+      customer_type: job.customer_type || job.customer?.customer_type || (job.vendor_id ? 'subcontract' : 'direct'),
+      
       vendor_name: job.vendor?.name || null,
       vendor_id: job.vendor?.id || null,
       site_locations: siteLocationsForDisplay,
-      manager_return_trip_needed: job.manager_return_trip_needed ?? null, // Include manager return trip fields
-      manager_return_trip_reason: job.manager_return_trip_reason || null, // Include manager return trip reason
+      manager_return_trip_needed: job.manager_return_trip_needed ?? null,
+      manager_return_trip_reason: job.manager_return_trip_reason || null,
     },
     technicians,
     units,

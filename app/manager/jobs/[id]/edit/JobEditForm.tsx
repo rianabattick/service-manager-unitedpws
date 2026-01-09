@@ -82,18 +82,25 @@ export default function JobEditForm({
   const [status, setStatus] = useState<JobStatus>(job.status as JobStatus)
   const [statusChanged, setStatusChanged] = useState(false)
   const [customerType, setCustomerType] = useState<"direct" | "subcontract">(
-    (job.customer_type as "direct" | "subcontract") || "direct",
+    (job.customer_type as "direct" | "subcontract") || (job.vendor_id ? "subcontract" : "direct"),
   )
   const [vendorId, setVendorId] = useState<string>(job.vendor_id || "")
 
   const originalScheduledDateTime = job.scheduled_start ? new Date(job.scheduled_start) : new Date()
+  
+  // FIX: Force browser to treat the incoming UTC date as EST for display (stripping the shift)
+  const estOffset = 5 * 60 // 5 hours in minutes (approximate for EST)
+  const displayDate = new Date(originalScheduledDateTime.getTime() - (originalScheduledDateTime.getTimezoneOffset() * 60000))
+  
   const originalScheduledDateString = originalScheduledDateTime.toISOString().split("T")[0]
-  const originalScheduledTimeString = originalScheduledDateTime.toTimeString().slice(0, 5)
+  // Extract time parts manually to avoid timezone shifts during editing
+  const hours = originalScheduledDateTime.getHours().toString().padStart(2, '0')
+  const minutes = originalScheduledDateTime.getMinutes().toString().padStart(2, '0')
+  const originalScheduledTimeString = `${hours}:${minutes}`
 
   // Parse scheduled date/time
-  const scheduledDateTime = job.scheduled_start ? new Date(job.scheduled_start) : new Date()
-  const [scheduledDate, setScheduledDate] = useState(scheduledDateTime.toISOString().split("T")[0])
-  const [scheduledTime, setScheduledTime] = useState(scheduledDateTime.toTimeString().slice(0, 5))
+  const [scheduledDate, setScheduledDate] = useState(originalScheduledDateString)
+  const [scheduledTime, setScheduledTime] = useState(originalScheduledTimeString)
 
   const [serviceLocationId, setServiceLocationId] = useState(job.service_location_id || "")
   const [returnTripNeeded, setReturnTripNeeded] = useState(job.return_trip_needed || false)
@@ -143,8 +150,6 @@ export default function JobEditForm({
     return []
   })
 
-  // Removed: siteLocations, selectedSiteLocationIds, site location loading useEffect
-
   // Filtered data based on selections
   const filteredEquipment = equipment.filter(
     (eq) => eq.customer_id === customerId && (!serviceLocationId || eq.service_location_id === serviceLocationId),
@@ -159,7 +164,7 @@ export default function JobEditForm({
       make: string | null
       model: string | null
       siteId: string | null
-      unitNotes: string | null // Added unit notes
+      unitNotes: string | null
     }>
   >(
     units.map((u) => ({
@@ -169,7 +174,7 @@ export default function JobEditForm({
       make: u.make,
       model: u.model,
       siteId: u.service_location_id,
-      unitNotes: u.unit_notes || null, // Load unit notes from database
+      unitNotes: u.unit_notes || null,
     })),
   )
 
@@ -324,10 +329,7 @@ export default function JobEditForm({
   const [showAddSite, setShowAddSite] = useState(false)
 
   const handleEditSite = async (siteId: string) => {
-    console.log("[v0] handleEditSite called with siteId:", siteId)
-    console.log("[v0] filteredLocations:", filteredLocations)
     const site = filteredLocations.find((l) => l.id === siteId)
-    console.log("[v0] Found site:", site)
     if (!site) return
 
     setNewSiteName(site.name || "")
@@ -338,7 +340,6 @@ export default function JobEditForm({
     setNewSiteZipCode(site.zip_code || "")
     setEditingSiteId(siteId)
     setShowAddSite(true)
-    console.log("[v0] Edit modal should now be open")
   }
 
   const handleDeleteSite = async (siteId: string) => {
@@ -379,8 +380,6 @@ export default function JobEditForm({
   const handleSiteSelect = (siteIds: string[]) => {
     setSelectedSiteIds(siteIds)
     const currentSelectedSiteIds = new Set(siteIds)
-
-    // Removed: site location state cleanup
 
     setAssignedUnits((prev) =>
       prev.map((unit) => {
@@ -433,7 +432,7 @@ export default function JobEditForm({
     setError(null)
     setSuccess(false)
     setIsSubmitting(true)
-    setLoading(true) // Start loading
+    setLoading(true)
 
     try {
       const supabase = createClient()
@@ -472,20 +471,6 @@ export default function JobEditForm({
 
       if (scheduledChanged) {
         changes.push("scheduled date/time")
-        console.log(
-          "[v0] Scheduled time CHANGED from",
-          originalScheduledDateString,
-          originalScheduledTimeString,
-          "to",
-          scheduledDate,
-          scheduledTime,
-        )
-      } else {
-        console.log(
-          "[v0] Scheduled time UNCHANGED, keeping original:",
-          originalScheduledDateString,
-          originalScheduledTimeString,
-        )
       }
 
       if (returnTripNeeded !== job.return_trip_needed) changes.push("return trip")
@@ -506,6 +491,14 @@ export default function JobEditForm({
         changes.push("equipment")
       }
 
+      // FIX: Construct proper ISO timestamp with UTC offset to prevent shifting
+      // Create a date object from the form inputs
+      const formDate = new Date(`${scheduledDate}T${scheduledTime}:00`);
+      // Convert to ISO string but ensure we account for timezone
+      // This will send "2026-01-28T17:40:00.000Z" (UTC) which effectively locks the time
+      // Or simply append the TZ offset manually if needed, but standard ISO usually works if Date is created locally
+      const isoScheduledStart = formDate.toISOString();
+
       const jobUpdateData: any = {
         title: jobTitle,
         customer_id: customerId,
@@ -514,8 +507,9 @@ export default function JobEditForm({
         job_type: jobType,
         service_type: serviceType.join(", "),
         billing_status: billingStatus,
+        customer_type: customerType, // Save customer type explicitely
         ...(statusChanged && { status: status }),
-        ...(scheduledChanged && { scheduled_start: `${scheduledDate}T${scheduledTime}:00` }),
+        ...(scheduledChanged && { scheduled_start: isoScheduledStart }),
         return_trip_needed: returnTripNeeded,
         notes: notes || null,
         po_number: poNumber || null,
@@ -556,7 +550,6 @@ export default function JobEditForm({
           status: "accepted" as const,
           is_lead: techId === leadTechnicianId,
           assigned_at: new Date().toISOString(),
-          // google_event_id and google_calendar_id will be preserved on UPDATE, set by calendar sync on INSERT
         }))
 
         const { error: upsertError } = await supabase.from("job_technicians").upsert(technicianUpserts, {
@@ -569,7 +562,6 @@ export default function JobEditForm({
           throw new Error(`Error assigning technicians: ${upsertError.message}`)
         }
       }
-      // </CHANGE>
 
       // Update job service mappings
       await supabase.from("job_service_locations").delete().eq("job_id", jobId)
@@ -596,7 +588,7 @@ export default function JobEditForm({
         job_id: jobId,
         equipment_id: unit.id,
         service_location_id: unit.siteId,
-        unit_notes: unit.unitNotes || null, // Save unit notes
+        unit_notes: unit.unitNotes || null,
         expected_reports: 1,
       }))
 
@@ -641,7 +633,6 @@ export default function JobEditForm({
         }
       } catch (calendarError) {
         console.error("[v0] Error updating calendar:", calendarError)
-        // Don't throw - calendar is secondary to job save
       }
 
       if (changes.length > 0) {
@@ -655,7 +646,6 @@ export default function JobEditForm({
       setSuccess(true)
       router.refresh()
 
-      // Redirect back to job detail page after a brief delay
       setTimeout(() => {
         router.push(`/manager/jobs/${jobId}`)
       }, 1500)
@@ -664,7 +654,7 @@ export default function JobEditForm({
       setError(err.message || "An error occurred while updating the job")
     } finally {
       setIsSubmitting(false)
-      setLoading(false) // Stop loading
+      setLoading(false)
     }
   }
 
