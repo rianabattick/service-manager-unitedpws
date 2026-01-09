@@ -321,6 +321,7 @@ export async function updateCalendarInviteForJob(jobId: string, newTechnicianIds
     }
 
     const job = await getJobDetail(jobId, currentUser.organization_id)
+    console.log("[v0] DEBUG JOB DATA:", JSON.stringify(job, null, 2)) // <--- Add this line
     if (!job) {
       return { success: false, error: "Job not found" }
     }
