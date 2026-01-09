@@ -885,7 +885,7 @@ export async function getJobDetail(jobId: string, organizationId: string): Promi
       // 2. If not, use the Customer's type
       // 3. If a Vendor ID exists, default to 'subcontract'
       // 4. Otherwise, 'direct'
-      customer_type: job.customer_type || job.customer?.customer_type || (job.vendor_id ? 'subcontract' : 'direct'),
+      customer_type: job.vendor_id ? 'subcontract' : (job.customer_type || job.customer?.customer_type || 'direct'),
       
       vendor_name: job.vendor?.name || null,
       vendor_id: job.vendor?.id || null,

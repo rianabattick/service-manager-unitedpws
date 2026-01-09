@@ -489,12 +489,11 @@ export default function JobEditForm({
         changes.push("equipment")
       }
 
-      // FIX: Construct proper ISO timestamp with UTC offset to prevent shifting
+      // FIX: Timezone Lock - Create standard ISO string
       const formDate = new Date(`${scheduledDate}T${scheduledTime}:00`);
       const isoScheduledStart = formDate.toISOString();
 
-      // FIX 2: Ensure UUID fields are never sent as empty strings ("")
-      // Convert "" to null to satisfy Postgres UUID type requirements
+      // FIX: Handle UUIDs safely (empty string -> null)
       const safeVendorId = customerType === "subcontract" && vendorId ? vendorId : null;
       const safeContractId = contractId || null;
       const safeServiceLocationId = serviceLocationId || null;
@@ -507,14 +506,14 @@ export default function JobEditForm({
         job_type: jobType,
         service_type: serviceType.join(", "),
         billing_status: billingStatus,
-        customer_type: customerType, // Explicitly save this
+        // CRITICAL FIX: Removed customer_type from here because the column does not exist!
         ...(statusChanged && { status: status }),
         ...(scheduledChanged && { scheduled_start: isoScheduledStart }),
         return_trip_needed: returnTripNeeded,
         notes: notes || null,
         po_number: poNumber || null,
         estimate_number: estimateNumber || null,
-        vendor_id: safeVendorId, // Use the safe version
+        vendor_id: safeVendorId, // We rely on this to determine Subcontract status
         updated_at: new Date().toISOString(),
       }
 
