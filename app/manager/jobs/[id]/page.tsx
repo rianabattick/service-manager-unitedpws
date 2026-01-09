@@ -9,32 +9,47 @@ import { DeleteJobButton } from "./DeleteJobButton"
 import { CompletionChecklist } from "./CompletionChecklist"
 import { ReturnTripManager } from "./ReturnTripManager"
 
+// Helper to format generic strings like "time_and_materials" -> "Time & Materials"
+function formatString(str: string | null) {
+  if (!str) return "Not set"
+  return str
+    .split(/_| /)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ")
+    .replace("And", "&")
+}
+
+// Specific helper for Billing Status to get exact casing
+function getBillingStatusLabel(status: string | null) {
+  if (!status) return "Not set"
+  
+  switch (status.toLowerCase()) {
+    case "sent_to_billing": return "Sent to billing"
+    case "invoiced": return "Invoiced"
+    case "paid": return "Paid"
+    case "processing": return "Processing"
+    case "un_billable": 
+    case "un-billable":
+    case "unbillable":
+      return "Un-billable" // Explicitly formatted with hyphen
+    default:
+      return formatString(status)
+  }
+}
+
 export default async function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
 
-  // Don't validate, don't fetch, just skip entirely to avoid interference
-  if (id === "new") {
-    return null
-  }
+  if (id === "new") return null
 
-  // Validate UUID format only
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-  if (!uuidRegex.test(id)) {
-    notFound()
-  }
+  if (!uuidRegex.test(id)) notFound()
 
   const user = await getCurrentUser()
+  if (!user) redirect("/login")
 
-  if (!user) {
-    redirect("/login")
-  }
-
-  // Fetch complete job detail
   const jobDetail = await getJobDetail(id, user.organization_id)
-
-  if (!jobDetail) {
-    notFound()
-  }
+  if (!jobDetail) notFound()
 
   const { job, technicians, units, contacts } = jobDetail
 
@@ -48,12 +63,10 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
   let daysLabel: string
 
   if (isJobClosed && job.completed_at) {
-    // For closed jobs, show days to complete
     const completedDate = new Date(job.completed_at)
     daysCount = Math.floor((completedDate.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24))
     daysLabel = `${daysCount} day${daysCount !== 1 ? "s" : ""} to complete`
   } else {
-    // For open jobs, show days open
     const now = new Date()
     daysCount = Math.floor((now.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24))
     daysLabel = `${daysCount} day${daysCount !== 1 ? "s" : ""} open`
@@ -106,7 +119,6 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
         </div>
       </div>
 
-      {/* Main Layout: 2-column on desktop, stacked on mobile */}
       <div className="grid grid-cols-1 lg:grid-cols-[2fr_1.2fr] gap-6">
         {/* Left Column */}
         <div className="space-y-6">
@@ -124,7 +136,8 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
 
                 <div>
                   <span className="text-sm text-muted-foreground">Customer Type</span>
-                  <p className="font-medium">{job.vendor_id ? "Subcontract" : "Direct"}</p>
+                  {/* Checks for override first, then defaults to "Direct" if empty */}
+                  <p className="font-medium">{formatString(job.customer_type || job.customer?.customer_type || (job.vendor_id ? "Subcontract" : "Direct"))}</p>
                 </div>
 
                 {job.vendor_name && (
@@ -138,9 +151,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
                   <div className="sm:col-span-2">
                     <span className="text-sm text-muted-foreground">Site Address(s)</span>
                     <div className="space-y-3 mt-1">
-                      {/* Group locations by service_location_id */}
                       {(() => {
-                        // Group locations by service_location_id
                         const groupedBySite = job.site_locations.reduce((acc: any, loc: any) => {
                           const siteId = loc.service_location_id
                           if (!acc[siteId]) {
@@ -151,7 +162,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
                               city: loc.service_location_city,
                               state: loc.service_location_state,
                               zip_code: loc.service_location_zip_code,
-                              notes: loc.site_notes, // Get site notes
+                              notes: loc.site_notes,
                             }
                           }
                           return acc
@@ -203,7 +214,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
                 <div>
                   <span className="text-sm text-muted-foreground">Job Type</span>
                   <p className="font-medium">
-                    {job.job_type === "contracted" ? "Contracted" : job.job_type === "daily" ? "Daily" : "Not set"}
+                    {formatString(job.job_type)}
                   </p>
                 </div>
 
@@ -214,14 +225,9 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
 
                 <div>
                   <span className="text-sm text-muted-foreground">Billing Status</span>
+                  {/* Uses the new helper to handle "Un-billable" */}
                   <p className="font-medium">
-                    {job.billing_status === "sent_to_billing"
-                      ? "Sent to billing"
-                      : job.billing_status === "invoiced"
-                        ? "Invoiced"
-                        : job.billing_status === "paid"
-                          ? "Paid"
-                          : "Not set"}
+                    {getBillingStatusLabel(job.billing_status)}
                   </p>
                 </div>
 
@@ -241,6 +247,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
                   <p className="font-medium">
                     {job.scheduled_start
                       ? new Date(job.scheduled_start).toLocaleString("en-US", {
+                          timeZone: "America/New_York",
                           weekday: "short",
                           month: "short",
                           day: "numeric",
@@ -320,7 +327,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
                 <div className="space-y-3">
                   {contacts.map((contact) => (
                     <div key={contact.id} className="p-3 rounded-lg border border-border">
-                      <p className="font-medium">{contact.name}</p>
+                      <p className="font-medium">{contact.name || `${contact.first_name || ''} ${contact.last_name || ''}`.trim() || 'Unknown'}</p>
                       <p className="text-sm text-muted-foreground">{contact.phone}</p>
                       {contact.email && <p className="text-sm text-muted-foreground">{contact.email}</p>}
                     </div>
@@ -417,7 +424,6 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
             />
           )}
 
-          {/* Return Trip Manager Section */}
           {isManager && (
             <ReturnTripManager
               jobId={id}
