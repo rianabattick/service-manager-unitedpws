@@ -102,7 +102,8 @@ export default async function DebugPage() {
                           </span>
                         </td>
                         <td className="py-3 text-muted-foreground">
-                          {job.scheduled_start ? new Date(job.scheduled_start).toLocaleDateString() : 'Not scheduled'}
+                          {/* FIX: Use helper function to display EST/EDT time */}
+                          {formatToLocalTime(job.scheduled_start)}
                         </td>
                         <td className="py-3">{job.customer_name}</td>
                         <td className="py-3 text-muted-foreground">{job.location_name || '—'}</td>
@@ -182,7 +183,8 @@ export default async function DebugPage() {
                           </span>
                         </td>
                         <td className="py-3 text-muted-foreground">
-                          {job.scheduled_start ? new Date(job.scheduled_start).toLocaleDateString() : 'Not scheduled'}
+                          {/* FIX: Use helper function to display EST/EDT time */}
+                          {formatToLocalTime(job.scheduled_start)}
                         </td>
                         <td className="py-3">{job.customer_name}</td>
                         <td className="py-3 text-muted-foreground">{job.location_name || '—'}</td>
@@ -236,6 +238,21 @@ export default async function DebugPage() {
       </div>
     </div>
   )
+}
+
+// Helper to fix timezone display issues
+function formatToLocalTime(dateString: string | null) {
+  if (!dateString) return "Not scheduled";
+  
+  return new Date(dateString).toLocaleString("en-US", {
+    timeZone: "America/New_York",
+    weekday: "short",
+    year: "numeric", 
+    month: "short", 
+    day: "numeric",
+    hour: "numeric",
+    minute: "numeric",
+  });
 }
 
 function getStatusColor(status: string): string {
