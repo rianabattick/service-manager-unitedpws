@@ -68,9 +68,6 @@ export default function JobEditForm({
   // Initialize form state with existing data
   const [jobTitle, setJobTitle] = useState(job.title || "")
   const [customerId, setCustomerId] = useState(job.customer_id || "")
-  const [jobTypeField, setJobTypeField] = useState<
-    "service_call" | "installation" | "maintenance" | "inspection" | "estimate" | "warranty"
-  >((job.job_type as any) || "service_call")
   const [jobType, setJobType] = useState<"time_and_materials" | "contracted">(
     (job.job_type as "time_and_materials" | "contracted") || "time_and_materials",
   )
@@ -79,12 +76,15 @@ export default function JobEditForm({
     job.service_type ? job.service_type.split(",").map((s) => s.trim()) : [],
   )
   const [billingStatus, setBillingStatus] = useState(job.billing_status || "processing")
+  // NEW STATE: Invoice Number
+  const [invoiceNumber, setInvoiceNumber] = useState(job.invoice_number || "")
+  
   const [status, setStatus] = useState<JobStatus>(job.status as JobStatus)
   const [statusChanged, setStatusChanged] = useState(false)
   
-  // FIX 1: Smart Initialization - If vendor exists, force 'subcontract'
+  // FIX: Smart Initialization - If vendor exists, force 'subcontract'
   const [customerType, setCustomerType] = useState<"direct" | "subcontract">(
-    job.customer_type === "subcontract" || job.vendor_id ? "subcontract" : "direct",
+    job.vendor_id ? "subcontract" : "direct"
   )
   const [vendorId, setVendorId] = useState<string>(job.vendor_id || "")
 
@@ -465,6 +465,7 @@ export default function JobEditForm({
       if (jobType !== job.job_type) changes.push("job type")
       if (serviceType.join(", ") !== job.service_type) changes.push("service type")
       if (billingStatus !== job.billing_status) changes.push("billing status")
+      if (invoiceNumber !== (job.invoice_number || "")) changes.push("invoice number")
       if (statusChanged && status !== job.status) changes.push("status")
 
       if (scheduledChanged) {
@@ -489,11 +490,11 @@ export default function JobEditForm({
         changes.push("equipment")
       }
 
-      // FIX: Timezone Lock - Create standard ISO string
+      // FIX: Construct proper ISO timestamp with UTC offset to prevent shifting
       const formDate = new Date(`${scheduledDate}T${scheduledTime}:00`);
       const isoScheduledStart = formDate.toISOString();
 
-      // FIX: Handle UUIDs safely (empty string -> null)
+      // FIX: Ensure UUID fields are never sent as empty strings ("")
       const safeVendorId = customerType === "subcontract" && vendorId ? vendorId : null;
       const safeContractId = contractId || null;
       const safeServiceLocationId = serviceLocationId || null;
@@ -506,14 +507,15 @@ export default function JobEditForm({
         job_type: jobType,
         service_type: serviceType.join(", "),
         billing_status: billingStatus,
-        // CRITICAL FIX: Removed customer_type from here because the column does not exist!
+        invoice_number: invoiceNumber || null, // NEW FIELD
+        // Removed customer_type to prevent database error
         ...(statusChanged && { status: status }),
         ...(scheduledChanged && { scheduled_start: isoScheduledStart }),
         return_trip_needed: returnTripNeeded,
         notes: notes || null,
         po_number: poNumber || null,
         estimate_number: estimateNumber || null,
-        vendor_id: safeVendorId, // We rely on this to determine Subcontract status
+        vendor_id: safeVendorId,
         updated_at: new Date().toISOString(),
       }
 
@@ -881,6 +883,18 @@ export default function JobEditForm({
               <option value="paid">Paid</option>
               <option value="un_billable">Un-billable</option>
             </select>
+          </div>
+
+          {/* Invoice Number - NEW FIELD */}
+          <div className="space-y-2">
+            <Label htmlFor="invoiceNumber">Invoice #</Label>
+            <Input
+              type="text"
+              id="invoiceNumber"
+              value={invoiceNumber}
+              onChange={(e) => setInvoiceNumber(e.target.value)}
+              placeholder="Invoice Number"
+            />
           </div>
 
           {/* Status */}

@@ -223,13 +223,22 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
                   <p className="font-medium">{job.service_type || "Not set"}</p>
                 </div>
 
-                <div>
-                  <span className="text-sm text-muted-foreground">Billing Status</span>
-                  {/* Uses the new helper to handle "Un-billable" */}
-                  <p className="font-medium">
-                    {getBillingStatusLabel(job.billing_status)}
-                  </p>
-                </div>
+                {/* VISIBILITY CHECK: Only Managers see Billing Status and Invoice # */}
+                {isManager && (
+                  <>
+                    <div>
+                      <span className="text-sm text-muted-foreground">Billing Status</span>
+                      <p className="font-medium">
+                        {getBillingStatusLabel(job.billing_status)}
+                      </p>
+                    </div>
+
+                    <div>
+                      <span className="text-sm text-muted-foreground">Invoice #</span>
+                      <p className="font-medium">{job.invoice_number || "—"}</p>
+                    </div>
+                  </>
+                )}
 
                 <div>
                   <span className="text-sm text-muted-foreground">Status</span>

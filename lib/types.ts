@@ -121,7 +121,9 @@ export interface Job {
   assigned_to: string | null
   po_number: string | null
   estimate_number: string | null
+  invoice_number: string | null // NEW FIELD ADDED
   subcontract_company_name: string | null
+  vendor_id: string | null
   created_at: string
   updated_at: string
 }
@@ -223,17 +225,19 @@ export interface JobDetail {
     service_agreement_number: string | null
     po_number: string | null
     estimate_number: string | null
+    invoice_number: string | null // NEW FIELD ADDED
     customer_type: "direct" | "subcontract" | null
     subcontract_company_name: string | null
-    manager_return_trip_needed: boolean | null // Added manager return trip fields
-    manager_return_trip_reason: string | null // Added manager return trip reason
+    vendor_name: string | null
+    manager_return_trip_needed: boolean | null 
+    manager_return_trip_reason: string | null 
   }
   technicians: {
     id: string
     full_name: string | null
     email: string | null
     status: JobTechnicianStatus
-    is_lead: boolean // Added is_lead to track lead technician
+    is_lead: boolean 
   }[]
   units: {
     equipment_id: string
@@ -244,6 +248,9 @@ export interface JobDetail {
     type: string | null
     expected_reports: number
     reports_uploaded: number
+    service_location_id: string | null
+    site_name: string | null
+    unit_notes: string | null
   }[]
   contacts: JobContact[]
 }
