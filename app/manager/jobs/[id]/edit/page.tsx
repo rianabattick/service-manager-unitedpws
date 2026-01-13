@@ -3,8 +3,11 @@ import { getCurrentUser, getJobDetail } from "@/lib/db"
 import { createClient } from "@/lib/supabase-server"
 import JobEditForm from "./JobEditForm"
 
-export default async function JobEditPage({ params }: { params: { id: string } }) {
-  const { id } = params
+// ADD THIS LINE TO FIX BUILD ERRORS
+export const dynamic = "force-dynamic"
+
+export default async function JobEditPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
 
   // Validate UUID format
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -31,7 +34,7 @@ export default async function JobEditPage({ params }: { params: { id: string } }
     notFound()
   }
 
-  const supabase = await createClient()
+  const supabase = createClient()
 
   const [
     { data: customers },
