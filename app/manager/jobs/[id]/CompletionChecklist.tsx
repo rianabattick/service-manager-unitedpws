@@ -25,7 +25,7 @@ export function CompletionChecklist({
     reports_sent_to_customer: false,
     reports_saved_in_file: false,
     invoiced: false,
-    no_pending_return_visits: false,
+    // Removed: no_pending_return_visits
     parts_logistics_completed: false,
   })
   const [isLoading, setIsLoading] = useState(true)
@@ -43,7 +43,7 @@ export function CompletionChecklist({
           reports_sent_to_customer: result.data.reports_sent_to_customer,
           reports_saved_in_file: result.data.reports_saved_in_file,
           invoiced: result.data.invoiced,
-          no_pending_return_visits: result.data.no_pending_return_visits,
+          // Removed: no_pending_return_visits from data load
           parts_logistics_completed: result.data.parts_logistics_completed,
         })
         if (result.data.completed_by && result.data.completed_at) {
@@ -81,6 +81,7 @@ export function CompletionChecklist({
     }
   }, [totalReports, uploadedReports, billingStatus, isLoading, jobId, currentStatus])
 
+  // This will now return TRUE even if the return trip field (which is gone) was false
   const allCompleted = Object.values(checklist).every((v) => v)
 
   const handleCheckChange = async (key: keyof typeof checklist, checked: boolean) => {
@@ -162,19 +163,7 @@ export function CompletionChecklist({
             </label>
           </div>
 
-          <div className="flex items-start gap-3">
-            <Checkbox
-              id="no_pending_return_visits"
-              checked={checklist.no_pending_return_visits}
-              onCheckedChange={(checked) => handleCheckChange("no_pending_return_visits", checked as boolean)}
-            />
-            <label
-              htmlFor="no_pending_return_visits"
-              className="text-sm cursor-pointer leading-none peer-disabled:opacity-70"
-            >
-              No pending return visits
-            </label>
-          </div>
+          {/* "No pending return visits" Checkbox removed from here */}
 
           <div className="flex items-start gap-3">
             <Checkbox
@@ -206,7 +195,7 @@ export function CompletionChecklist({
                 Confirmed by: {completionInfo.completedBy}
               </p>
               <p className="text-xs text-green-700 dark:text-green-300 mt-1">
-                {new Date(completionInfo.completedAt).toLocaleString("en-US", {
+                {new Date(completionInfo.completedAt!).toLocaleString("en-US", {
                   month: "short",
                   day: "numeric",
                   year: "numeric",
