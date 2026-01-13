@@ -7,6 +7,8 @@ import { JobsViewToggle } from "./JobsViewToggle"
 import { PaginationWrapper } from "@/components/ui/pagination-wrapper"
 import { PageHeader } from "@/components/shared/PageHeader"
 
+export const dynamic = "force-dynamic"
+
 interface SearchParams {
   status?: string
   fromDate?: string
