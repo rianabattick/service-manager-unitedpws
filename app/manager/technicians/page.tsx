@@ -5,6 +5,8 @@ import { getCurrentUser } from "@/lib/db"
 import { createClient } from "@/lib/supabase-server"
 import { PageHeader } from "@/components/shared/PageHeader"
 
+export const dynamic = "force-dynamic"
+
 interface SearchParams {
   status?: string
   specialty?: string

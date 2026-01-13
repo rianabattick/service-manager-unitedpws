@@ -2,6 +2,8 @@ import { redirect } from "next/navigation"
 import { getCurrentUser } from "@/lib/db"
 import TechnicianForm from "../TechnicianForm"
 
+export const dynamic = "force-dynamic"
+
 export default async function NewTechnicianPage() {
   const user = await getCurrentUser()
 

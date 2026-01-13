@@ -1,6 +1,8 @@
 import { getCurrentUser, listManagerDashboardJobs, listTechnicianJobs, listNotificationsForUser } from '@/lib/db'
 import type { UserRole } from '@/lib/types'
 
+export const dynamic = "force-dynamic"
+
 export default async function DebugPage() {
   // Get current user (in production, this would come from auth session)
   const user = await getCurrentUser()

@@ -5,6 +5,8 @@ import Link from "next/link"
 import { redirect } from "next/navigation"
 import { PageHeader } from "@/components/shared/PageHeader"
 
+export const dynamic = "force-dynamic"
+
 export default async function ManagerDashboard() {
   const user = await getCurrentUser()
 

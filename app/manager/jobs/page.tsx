@@ -8,6 +8,8 @@ import { JobsViewToggle } from "./JobsViewToggle"
 import { checkAndUpdateOverdueJobs } from "@/lib/job-helpers"
 import { PageHeader } from "@/components/shared/PageHeader"
 
+export const dynamic = "force-dynamic"
+
 interface SearchParams {
   status?: string
   fromDate?: string

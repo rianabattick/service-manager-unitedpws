@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase-server"
 import { ScheduleCalendar } from "@/components/shared/ScheduleCalendar"
 import { PageHeader } from "@/components/shared/PageHeader"
 
+export const dynamic = "force-dynamic"
+
 export default async function ManagerSchedulePage() {
   const user = await getCurrentUser()
 
