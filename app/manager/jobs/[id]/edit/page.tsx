@@ -34,7 +34,7 @@ export default async function JobEditPage({ params }: { params: Promise<{ id: st
     notFound()
   }
 
-  const supabase = createClient()
+  const supabase = await createClient()
 
   const [
     { data: customers },

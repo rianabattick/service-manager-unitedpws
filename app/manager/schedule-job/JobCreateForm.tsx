@@ -118,6 +118,7 @@ export function JobCreateForm({
   const [contractId, setContractId] = useState("")
   const [serviceType, setServiceType] = useState<string[]>([])
   const [billingStatus, setBillingStatus] = useState("processing")
+  const [invoiceNumber, setInvoiceNumber] = useState("")
   const [status, setStatus] = useState<JobStatus>("confirmed")
   const [scheduledDate, setScheduledDate] = useState("")
   const [scheduledTime, setScheduledTime] = useState("")
@@ -747,6 +748,7 @@ export function JobCreateForm({
           scheduled_start: new Date(`${scheduledDate}T${scheduledTime}`).toISOString(),
           po_number: poNumber || null,
           estimate_number: estimateNumber || null,
+          invoice_number: invoiceNumber || null,
           return_trip_needed: returnTripNeeded,
           service_agreement_id: jobType === "contracted" && contractId ? contractId : null,
           notes: notes || null,
@@ -1139,6 +1141,19 @@ export function JobCreateForm({
               <option value="un_billable">Un-billable</option>
             </select>
           </div>
+
+          {/* --- START OF NEW CODE --- */}
+          <div className="space-y-2">
+            <Label htmlFor="invoiceNumber">Invoice #</Label>
+            <Input
+              type="text"
+              id="invoiceNumber"
+              value={invoiceNumber}
+              onChange={(e) => setInvoiceNumber(e.target.value)}
+              placeholder="Invoice Number"
+            />
+          </div>
+          {/* --- END OF NEW CODE --- */}
 
           {/* Status */}
           <div className="space-y-2">
