@@ -77,7 +77,6 @@ export function ContractForm({
   const [agreementLengthYears, setAgreementLengthYears] = useState(1)
   const [startDate, setStartDate] = useState(contract?.start_date || "")
   const [endDate, setEndDate] = useState(contract?.end_date || "")
-  const [serviceNotes, setServiceNotes] = useState(contract?.notes || "")
   const [pmDueNext, setPmDueNext] = useState("")
   const [unitInformation, setUnitInformation] = useState("")
   const [notes, setNotes] = useState(contract?.notes || "")
@@ -178,7 +177,7 @@ export function ContractForm({
           vendorId: vendorId || null,
           startDate,
           endDate,
-          notes: serviceNotes,
+          notes: notes,
           services,
           agreementLengthYears,
           pmDueNext: pmDueNext || undefined,
@@ -199,7 +198,7 @@ export function ContractForm({
           startDate,
           endDate,
           services,
-          notes: serviceNotes,
+          notes: notes,
           createdBy: userId,
           agreementLengthYears,
           pmDueNext: pmDueNext || undefined,
@@ -419,17 +418,6 @@ export function ContractForm({
                 {totalPMsPerYear} PM{totalPMsPerYear !== 1 ? "s" : ""} per year
               </p>
             )}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="serviceNotes">Service Notes</Label>
-            <Textarea
-              id="serviceNotes"
-              value={serviceNotes}
-              onChange={(e) => setServiceNotes(e.target.value)}
-              rows={3}
-              placeholder="Add service-specific notes..."
-            />
           </div>
 
           <div className="space-y-2">
