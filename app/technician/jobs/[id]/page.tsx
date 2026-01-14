@@ -6,6 +6,16 @@ import { ArrowLeft } from "lucide-react"
 import { getStatusColor, getTechnicianStatusColor } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 
+// Helper to format generic strings like "time_and_materials" -> "Time & Materials"
+function formatString(str: string | null) {
+  if (!str) return "Not set"
+  return str
+    .split(/_| /)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ")
+    .replace("And", "&")
+}
+
 export default async function TechnicianJobDetailPage({ params }: { params: { id: string } }) {
   const user = await getCurrentUser()
 
@@ -26,7 +36,8 @@ export default async function TechnicianJobDetailPage({ params }: { params: { id
     notFound()
   }
 
-  const { job, technicians, units } = jobDetail
+  // ADDED: Destructure 'contacts' so we can use them
+  const { job, technicians, units, contacts } = jobDetail
 
   // Check if this technician is assigned to this job
   const technicianAssignment = technicians.find((t) => t.id === user.id)
@@ -59,7 +70,11 @@ export default async function TechnicianJobDetailPage({ params }: { params: { id
             </span>
           )}
         </div>
-        <p className="text-muted-foreground">Job details including units and report expectations.</p>
+        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+          <span className="font-mono">Job #{job.job_number || job.id}</span>
+          <span>•</span>
+          <span>Scheduled: {job.scheduled_start ? new Date(job.scheduled_start).toLocaleDateString() : "Not set"}</span>
+        </div>
       </div>
 
       {/* Main Layout: 2-column on desktop, stacked on mobile */}
@@ -78,12 +93,28 @@ export default async function TechnicianJobDetailPage({ params }: { params: { id
                   <p className="font-medium">{job.customer_name}</p>
                 </div>
 
+                <div>
+                  <span className="text-sm text-muted-foreground">Customer Type</span>
+                  <p className="font-medium">
+                    {formatString(
+                      job.customer_type || job.customer?.customer_type || (job.vendor_id ? "Subcontract" : "Direct"),
+                    )}
+                  </p>
+                </div>
+
+                {job.vendor_name && (
+                  <div>
+                    <span className="text-sm text-muted-foreground">Subcontracted By</span>
+                    <p className="font-medium">{job.vendor_name}</p>
+                  </div>
+                )}
+
+                {/* Site Address Logic */}
                 {job.site_locations && job.site_locations.length > 0 ? (
                   <div className="sm:col-span-2">
                     <span className="text-sm text-muted-foreground">Site Address(s)</span>
                     <div className="space-y-3 mt-1">
                       {(() => {
-                        // Group locations by service_location_id to avoid duplicates
                         const groupedBySite = job.site_locations.reduce((acc: any, loc: any) => {
                           const siteId = loc.service_location_id
                           if (!acc[siteId]) {
@@ -94,7 +125,7 @@ export default async function TechnicianJobDetailPage({ params }: { params: { id
                               city: loc.service_location_city,
                               state: loc.service_location_state,
                               zip_code: loc.service_location_zip_code,
-                              notes: loc.site_notes, // Get site notes
+                              notes: loc.site_notes,
                             }
                           }
                           return acc
@@ -113,7 +144,7 @@ export default async function TechnicianJobDetailPage({ params }: { params: { id
                               </p>
                             )}
                             {site.notes && (
-                              <div className="mt-2 p-2 bg-muted rounded text-xs">
+                              <div className="ml-2 mt-2 p-2 bg-muted rounded text-xs">
                                 <p className="font-medium text-muted-foreground mb-1">Site Notes:</p>
                                 <p className="whitespace-pre-wrap">{site.notes}</p>
                               </div>
@@ -128,7 +159,7 @@ export default async function TechnicianJobDetailPage({ params }: { params: { id
                     <span className="text-sm text-muted-foreground">Site Address</span>
                     <div className="mt-1">
                       <p className="font-medium">{job.site_name}</p>
-                      {job.site_address && <p className="text-sm text-muted-foreground">{job.site_address}</p>}
+                      {job.site_address && <p className="text-sm text-muted-foreground mt-1">{job.site_address}</p>}
                     </div>
                   </div>
                 ) : null}
@@ -145,15 +176,16 @@ export default async function TechnicianJobDetailPage({ params }: { params: { id
 
                 <div>
                   <span className="text-sm text-muted-foreground">Job Type</span>
-                  <p className="font-medium">
-                    {job.job_type === "contracted" ? "Contracted" : job.job_type === "daily" ? "Daily" : "Not set"}
-                  </p>
+                  {/* FIXED: Uses formatString to handle any value correctly */}
+                  <p className="font-medium">{formatString(job.job_type)}</p>
                 </div>
 
                 <div>
                   <span className="text-sm text-muted-foreground">Service</span>
                   <p className="font-medium">{job.service_type || "Not set"}</p>
                 </div>
+
+                {/* Billing Status & Invoice # are hidden here */}
 
                 <div>
                   <span className="text-sm text-muted-foreground">Status</span>
@@ -171,6 +203,7 @@ export default async function TechnicianJobDetailPage({ params }: { params: { id
                   <p className="font-medium">
                     {job.scheduled_start
                       ? new Date(job.scheduled_start).toLocaleString("en-US", {
+                          timeZone: "America/New_York",
                           weekday: "short",
                           month: "short",
                           day: "numeric",
@@ -185,9 +218,11 @@ export default async function TechnicianJobDetailPage({ params }: { params: { id
                 <div>
                   <span className="text-sm text-muted-foreground">Contract</span>
                   <p className="font-medium">
-                    {job.service_agreement_number
-                      ? `Contract #${job.service_agreement_number}`
-                      : "No contract (daily job)"}
+                    {job.service_agreement_title
+                      ? job.service_agreement_title
+                      : job.service_agreement_number
+                        ? `Contract #${job.service_agreement_number}`
+                        : "No contract (daily job)"}
                   </p>
                 </div>
 
@@ -199,7 +234,7 @@ export default async function TechnicianJobDetailPage({ params }: { params: { id
             </CardContent>
           </Card>
 
-          {/* Technicians Section */}
+          {/* Field Engineers Assigned Section */}
           <Card>
             <CardHeader>
               <CardTitle>Field Engineers Assigned</CardTitle>
@@ -225,18 +260,38 @@ export default async function TechnicianJobDetailPage({ params }: { params: { id
                           )}
                         </p>
                         {tech.email && tech.full_name && <p className="text-xs text-muted-foreground">{tech.email}</p>}
-                        {/* Site Address and Location Display */}
-                        {tech.site_address && tech.site_location_name && (
-                          <p className="text-xs text-muted-foreground">
-                            Site: {tech.site_address} → {tech.site_location_name}
-                          </p>
-                        )}
                       </div>
                       <span
                         className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getTechnicianStatusColor(tech.status)}`}
                       >
                         {tech.status}
                       </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* ADDED: Point(s) of Contact Section */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Point(s) of Contact</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {contacts.length === 0 ? (
+                <p className="text-muted-foreground text-sm">No point of contact added for this job yet.</p>
+              ) : (
+                <div className="space-y-3">
+                  {contacts.map((contact) => (
+                    <div key={contact.id} className="p-3 rounded-lg border border-border">
+                      <p className="font-medium">
+                        {contact.name ||
+                          `${contact.first_name || ""} ${contact.last_name || ""}`.trim() ||
+                          "Unknown"}
+                      </p>
+                      <p className="text-sm text-muted-foreground">{contact.phone}</p>
+                      {contact.email && <p className="text-sm text-muted-foreground">{contact.email}</p>}
                     </div>
                   ))}
                 </div>
@@ -277,7 +332,6 @@ export default async function TechnicianJobDetailPage({ params }: { params: { id
                             </p>
                           )}
                           {unit.type && <p className="text-xs text-muted-foreground capitalize">{unit.type}</p>}
-                          {/* Site Name and Location Name */}
                           {unit.site_name && <p className="text-xs text-muted-foreground">Site: {unit.site_name}</p>}
                         </div>
                         <span className="text-xs text-muted-foreground whitespace-nowrap">
