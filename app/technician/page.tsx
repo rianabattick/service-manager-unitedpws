@@ -248,8 +248,16 @@ export default async function TechnicianDashboardPage() {
                     Go to My Jobs
                   </Link>
                 </li>
-                <li className="text-muted-foreground">View schedule (coming soon)</li>
-                <li className="text-muted-foreground">View notifications (coming soon)</li>
+                <li>
+                  <Link href="/technician/schedule" className="text-primary hover:underline">
+                    View Schedule
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/technician/notifications" className="text-primary hover:underline">
+                    View Notifications
+                  </Link>
+                </li>
               </ul>
             </CardContent>
           </Card>
