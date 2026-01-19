@@ -1204,9 +1204,29 @@ export function JobCreateForm({
           </div>
 
           {/* Site */}
+          {/* Site */}
           <div className="space-y-2">
-            {/* Changed label from "Site Addresses" to "Site Address(s)" */}
-            <Label htmlFor="sites">Site Address(s)</Label>
+            <div className="flex items-center justify-between">
+              {/* Changed label from "Site Addresses" to "Site Address(s)" */}
+              <Label htmlFor="sites">Site Address(s)</Label>
+              <Button
+                type="button"
+                onClick={() => {
+                  setEditingSiteId(null)
+                  setNewSiteName("")
+                  setNewSiteAddress("")
+                  setNewSiteCity("")
+                  setNewSiteState("")
+                  setNewSiteZipCode("")
+                  setShowAddSite(true)
+                }}
+                variant="outline"
+                size="sm"
+                disabled={!customerId}
+              >
+                + Add Site
+              </Button>
+            </div>
             <MultiSelectSite
               sites={filteredLocations}
               selectedSiteIds={selectedSiteIds}
