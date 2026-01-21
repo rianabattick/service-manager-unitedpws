@@ -329,9 +329,9 @@ export function ContractForm({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="gold">Gold</SelectItem>
-                <SelectItem value="Remedial">Remedial</SelectItem>
-                <SelectItem value="PM Contract">PM Contract</SelectItem>
-                <SelectItem value="Pseudo Gold">Pseudo Gold</SelectItem>
+                <SelectItem value="remedial">Remedial</SelectItem>
+                <SelectItem value="pm_contract">PM Contract</SelectItem>
+                <SelectItem value="pseudo_gold">Pseudo Gold</SelectItem>
               </SelectContent>
             </Select>
           </div>
