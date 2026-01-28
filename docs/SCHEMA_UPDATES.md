@@ -16,14 +16,14 @@ This document explains the schema updates applied to support enhanced multi-tech
 Provides human-readable login identifiers (e.g., "SU001" for managers, "U001" for technicians) as an alternative to email-based authentication.
 
 ### Usage
-```sql
+\`\`\`sql
 -- Assign login codes to users
 UPDATE users SET login_code = 'SU001' WHERE email = 'manager@example.com';
 UPDATE users SET login_code = 'U001' WHERE email = 'tech1@example.com';
 
 -- Query by login code
 SELECT * FROM users WHERE login_code = 'U001';
-```
+\`\`\`
 
 ---
 
@@ -49,23 +49,23 @@ SELECT * FROM users WHERE login_code = 'U001';
 ### Usage Examples
 
 **Assigning Multiple Technicians to a Job:**
-```sql
+\`\`\`sql
 -- Assign two technicians to a job
 INSERT INTO job_technicians (job_id, technician_id, status)
 VALUES 
   ('job-uuid-1', 'tech1-uuid', 'pending'),
   ('job-uuid-1', 'tech2-uuid', 'pending');
-```
+\`\`\`
 
 **Technician Accepts Assignment:**
-```sql
+\`\`\`sql
 UPDATE job_technicians
 SET status = 'accepted', responded_at = NOW()
 WHERE job_id = 'job-uuid-1' AND technician_id = 'tech1-uuid';
-```
+\`\`\`
 
 **Check if All Technicians Accepted:**
-```sql
+\`\`\`sql
 -- Count pending assignments for a job
 SELECT COUNT(*) as pending_count
 FROM job_technicians
@@ -73,14 +73,14 @@ WHERE job_id = 'job-uuid-1' AND status = 'pending';
 
 -- If pending_count = 0, update job status to 'accepted'
 UPDATE jobs SET status = 'accepted' WHERE id = 'job-uuid-1';
-```
+\`\`\`
 
 **Storing Google Calendar Event ID:**
-```sql
+\`\`\`sql
 UPDATE job_technicians
 SET google_event_id = 'google-calendar-event-id-xyz'
 WHERE job_id = 'job-uuid-1' AND technician_id = 'tech1-uuid';
-```
+\`\`\`
 
 ---
 
@@ -99,17 +99,17 @@ WHERE job_id = 'job-uuid-1' AND technician_id = 'tech1-uuid';
 ### Usage Examples
 
 **Link Equipment to a Job:**
-```sql
+\`\`\`sql
 -- A maintenance job servicing 3 HVAC units
 INSERT INTO job_equipment (job_id, equipment_id, expected_reports)
 VALUES 
   ('job-uuid-1', 'hvac-unit-1-uuid', 2), -- Expect 2 photos
   ('job-uuid-1', 'hvac-unit-2-uuid', 2),
   ('job-uuid-1', 'hvac-unit-3-uuid', 1); -- Expect 1 photo
-```
+\`\`\`
 
 **Calculate "X / Y Reports Uploaded" for a Job:**
-```sql
+\`\`\`sql
 SELECT 
   je.equipment_id,
   e.name AS equipment_name,
@@ -123,16 +123,16 @@ LEFT JOIN job_attachments ja ON ja.job_id = je.job_id
   AND ja.type IN ('photo', 'document')
 WHERE je.job_id = 'job-uuid-1'
 GROUP BY je.equipment_id, e.name, je.expected_reports;
-```
+\`\`\`
 
 **Example Result:**
-```
+\`\`\`
 equipment_id          | equipment_name | expected_reports | reports_uploaded | progress
 ----------------------|----------------|------------------|------------------|----------
 hvac-unit-1-uuid      | Unit A         | 2                | 2                | 2 / 2
 hvac-unit-2-uuid      | Unit B         | 2                | 1                | 1 / 2
 hvac-unit-3-uuid      | Unit C         | 1                | 0                | 0 / 1
-```
+\`\`\`
 
 ---
 
@@ -148,7 +148,7 @@ Links each attachment (photo/document/report) to a specific equipment/unit, enab
 ### Usage Examples
 
 **Upload a Photo for Specific Equipment:**
-```sql
+\`\`\`sql
 INSERT INTO job_attachments (
   job_id, 
   equipment_id,  -- Link to specific unit
@@ -165,16 +165,16 @@ VALUES (
   'unit-a-inspection.jpg',
   'tech1-uuid'
 );
-```
+\`\`\`
 
 **Find All Reports for a Specific Equipment:**
-```sql
+\`\`\`sql
 SELECT *
 FROM job_attachments
 WHERE job_id = 'job-uuid-1' 
   AND equipment_id = 'hvac-unit-1-uuid'
   AND type IN ('photo', 'document');
-```
+\`\`\`
 
 ---
 
@@ -196,7 +196,7 @@ WHERE job_id = 'job-uuid-1'
 ### Usage Examples
 
 #### Event: Technician Assigned to Job
-```sql
+\`\`\`sql
 -- Create notification when technician is assigned
 INSERT INTO notifications (
   organization_id,
@@ -217,10 +217,10 @@ FROM job_technicians jt
 JOIN jobs j ON j.id = jt.job_id
 JOIN customers c ON c.id = j.customer_id
 WHERE jt.id = 'newly-created-assignment-uuid';
-```
+\`\`\`
 
 #### Event: Technician Accepts Job
-```sql
+\`\`\`sql
 -- Notify manager when technician accepts
 INSERT INTO notifications (
   organization_id,
@@ -244,10 +244,10 @@ CROSS JOIN users manager
 WHERE jt.status = 'accepted'
   AND manager.organization_id = u.organization_id
   AND manager.role IN ('owner', 'admin', 'manager');
-```
+\`\`\`
 
 #### Event: Report Uploaded
-```sql
+\`\`\`sql
 -- Notify manager when technician uploads a report
 INSERT INTO notifications (
   organization_id,
@@ -271,10 +271,10 @@ CROSS JOIN users manager
 WHERE ja.id = 'newly-uploaded-attachment-uuid'
   AND manager.organization_id = j.organization_id
   AND manager.role IN ('owner', 'admin', 'manager');
-```
+\`\`\`
 
 #### Event: Contract Scheduling Needed
-```sql
+\`\`\`sql
 -- Daily cron job to check contracts needing service scheduling
 INSERT INTO notifications (
   organization_id,
@@ -303,10 +303,10 @@ WHERE sa.status = 'active'
       AND n.type = 'contract_scheduling_needed'
       AND n.created_at > CURRENT_DATE - INTERVAL '1 day'
   );
-```
+\`\`\`
 
 #### Event: Contract Renewal Needed
-```sql
+\`\`\`sql
 -- Daily cron job to check contracts expiring soon
 INSERT INTO notifications (
   organization_id,
@@ -335,10 +335,10 @@ WHERE sa.status = 'active'
       AND n.type = 'contract_renewal_needed'
       AND n.created_at > CURRENT_DATE - INTERVAL '7 days'
   );
-```
+\`\`\`
 
 #### Event: Contract Ended
-```sql
+\`\`\`sql
 -- Daily cron job to notify about expired contracts
 INSERT INTO notifications (
   organization_id,
@@ -366,21 +366,21 @@ WHERE sa.status = 'active'
 UPDATE service_agreements
 SET status = 'expired'
 WHERE status = 'active' AND end_date = CURRENT_DATE;
-```
+\`\`\`
 
 **Mark Notification as Read:**
-```sql
+\`\`\`sql
 UPDATE notifications
 SET is_read = true, read_at = NOW()
 WHERE id = 'notification-uuid' AND recipient_user_id = auth.uid();
-```
+\`\`\`
 
 **Get Unread Count:**
-```sql
+\`\`\`sql
 SELECT COUNT(*) as unread_count
 FROM notifications
 WHERE recipient_user_id = auth.uid() AND is_read = false;
-```
+\`\`\`
 
 ---
 
@@ -390,11 +390,11 @@ WHERE recipient_user_id = auth.uid() AND is_read = false;
 - Updated `jobs.status` CHECK constraint to include 'accepted' as a valid status
 
 ### Status Workflow
-```
+\`\`\`
 draft → scheduled → accepted → dispatched → in_progress → completed
                                     ↓
                               cancelled / on_hold
-```
+\`\`\`
 
 **Status Meanings:**
 - `draft` - Job is being created
@@ -409,7 +409,7 @@ draft → scheduled → accepted → dispatched → in_progress → completed
 ### Usage Example
 
 **Update Job to 'accepted' When All Technicians Accept:**
-```sql
+\`\`\`sql
 -- Trigger or application logic after technician accepts
 UPDATE jobs
 SET status = 'accepted'
@@ -421,20 +421,20 @@ WHERE id = 'job-uuid-1'
     WHERE jt.job_id = 'job-uuid-1'
       AND jt.status = 'pending'
   );
-```
+\`\`\`
 
 ---
 
 ## Complete Workflow Example: Multi-Technician Job with Reports
 
 ### Step 1: Create Job
-```sql
+\`\`\`sql
 INSERT INTO jobs (organization_id, customer_id, job_number, title, type, status)
 VALUES ('org-uuid', 'customer-uuid', 'JOB-2025-001', 'Quarterly Maintenance', 'maintenance', 'scheduled');
-```
+\`\`\`
 
 ### Step 2: Assign Technicians
-```sql
+\`\`\`sql
 INSERT INTO job_technicians (job_id, technician_id, status)
 VALUES 
   ('job-uuid', 'tech1-uuid', 'pending'),
@@ -442,28 +442,28 @@ VALUES
 
 -- Create notifications for each technician
 -- (See notification examples above)
-```
+\`\`\`
 
 ### Step 3: Link Equipment
-```sql
+\`\`\`sql
 INSERT INTO job_equipment (job_id, equipment_id, expected_reports)
 VALUES 
   ('job-uuid', 'hvac-1-uuid', 2),
   ('job-uuid', 'hvac-2-uuid', 2);
-```
+\`\`\`
 
 ### Step 4: Technicians Accept
-```sql
+\`\`\`sql
 UPDATE job_technicians
 SET status = 'accepted', responded_at = NOW()
 WHERE job_id = 'job-uuid' AND technician_id = 'tech1-uuid';
 
 -- If all techs accepted, update job status
 UPDATE jobs SET status = 'accepted' WHERE id = 'job-uuid';
-```
+\`\`\`
 
 ### Step 5: Upload Reports
-```sql
+\`\`\`sql
 -- Tech 1 uploads photo for HVAC Unit 1
 INSERT INTO job_attachments (job_id, equipment_id, type, file_url, file_name, uploaded_by)
 VALUES ('job-uuid', 'hvac-1-uuid', 'photo', 'url1', 'hvac1-before.jpg', 'tech1-uuid');
@@ -471,10 +471,10 @@ VALUES ('job-uuid', 'hvac-1-uuid', 'photo', 'url1', 'hvac1-before.jpg', 'tech1-u
 -- Tech 2 uploads photo for HVAC Unit 2
 INSERT INTO job_attachments (job_id, equipment_id, type, file_url, file_name, uploaded_by)
 VALUES ('job-uuid', 'hvac-2-uuid', 'photo', 'url2', 'hvac2-after.jpg', 'tech2-uuid');
-```
+\`\`\`
 
 ### Step 6: Check Progress
-```sql
+\`\`\`sql
 SELECT 
   e.name,
   je.expected_reports,
@@ -485,7 +485,7 @@ JOIN equipment e ON e.id = je.equipment_id
 LEFT JOIN job_attachments ja ON ja.job_id = je.job_id AND ja.equipment_id = je.equipment_id
 WHERE je.job_id = 'job-uuid'
 GROUP BY e.name, je.expected_reports;
-```
+\`\`\`
 
 ---
 

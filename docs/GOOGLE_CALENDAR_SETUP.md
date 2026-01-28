@@ -16,14 +16,14 @@ To enable Google Calendar invites, you need to complete a one-time OAuth2 author
 
 Add the following environment variables to your Vercel project in the **Vars section** of the in-chat sidebar:
 
-```bash
+\`\`\`bash
 # Google Calendar OAuth Credentials (already configured)
 GOOGLE_CLIENT_ID=<your-client-id>
 GOOGLE_CLIENT_SECRET=<your-client-secret>
 
 # Refresh Token (obtained from /admin/google-auth)
 GOOGLE_REFRESH_TOKEN=<your-refresh-token>
-```
+\`\`\`
 
 **Note:** The `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are already configured in your Vercel environment variables. You only need to add the `GOOGLE_REFRESH_TOKEN` after completing the authorization flow.
 
