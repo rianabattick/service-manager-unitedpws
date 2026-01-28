@@ -25,7 +25,7 @@ A comprehensive service management system built with Next.js, Supabase, and Goog
 
 Create a `.env.local` file in the root directory with the following variables:
 
-```bash
+\`\`\`bash
 # Supabase Configuration (automatically provided by Vercel integration)
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
@@ -36,11 +36,11 @@ GOOGLE_API_KEY=your_google_api_key
 GOOGLE_OAUTH_CLIENT_ID=your_google_oauth_client_id
 GOOGLE_OAUTH_CLIENT_SECRET=your_google_oauth_client_secret
 NEXT_PUBLIC_APP_URL=https://your-app-url.vercel.app
-```
+\`\`\`
 
 ### Installation
 
-```bash
+\`\`\`bash
 # Install dependencies
 npm install
 # or
@@ -50,7 +50,7 @@ bun install
 npm run dev
 # or
 bun dev
-```
+\`\`\`
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 

@@ -75,6 +75,15 @@ function buildEventDescription(job: any, equipmentList: any[], contacts: any[]) 
   
   d += `Return Trip: ${job.return_trip_needed ? "Yes" : "No"}\n`
 
+  if (technicians && technicians.length > 0) {
+    d += `\nASSIGNED ENGINEERS\n${separator}\n\n`
+    technicians.forEach((t: any) => {
+      // Tries full_name, falls back to email, or "Unknown"
+      const techName = t.full_name || t.email || "Unknown Tech"
+      d += `• ${techName}\n`
+    })
+  }
+
   d += `\nLOCATION\n${separator}\n\n`
   if (job.site_locations?.length) {
     job.site_locations.forEach((site: any) => {
@@ -122,8 +131,9 @@ function buildEventDescription(job: any, equipmentList: any[], contacts: any[]) 
     })
   }
 
-  if (job.internal_notes) {
-    d += `NOTES\n${separator}\n\n${job.internal_notes}\n`
+  const jobNotes = job.notes || job.internal_notes || "";
+  if (jobNotes) {
+    d += `NOTES\n${separator}\n\n${jobNotes}\n`
   }
 
   d += `\nScheduled by: schedule@unitedpws.com`
