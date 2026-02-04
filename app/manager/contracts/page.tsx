@@ -22,8 +22,10 @@ interface SearchParams {
 export default async function ContractsPage({
   searchParams,
 }: {
-  searchParams: SearchParams
+  searchParams: Promise<SearchParams>
 }) {
+  // Await the searchParams before accessing properties
+  const resolvedParams = await searchParams
   const user = await getCurrentUser()
 
   if (!user) {
@@ -66,19 +68,19 @@ export default async function ContractsPage({
 
   const supabase = await createClient()
 
-  const viewMode = searchParams.view || "active"
+  const viewMode = resolvedParams.view || "active"
 
-  const page = Number.parseInt((searchParams as any).page || "1")
+  const page = Number.parseInt((resolvedParams as any).page || "1")
   const itemsPerPage = 20
   const offset = (page - 1) * itemsPerPage
 
   // Fetch contracts with filters
   const contracts = await listContractsFromLib({
     organizationId: user.organization_id,
-    status: searchParams.status,
-    customerType: searchParams.customerType,
-    customerId: searchParams.customer,
-    coveragePlan: searchParams.coveragePlan,
+    status: resolvedParams.status,
+    customerType: resolvedParams.customerType,
+    customerId: resolvedParams.customer,
+    coveragePlan: resolvedParams.coveragePlan,
     viewMode,
   })
 
@@ -122,7 +124,7 @@ export default async function ContractsPage({
               <select
                 id="status"
                 name="status"
-                defaultValue={searchParams.status || ""}
+                defaultValue={resolvedParams.status || ""}
                 className="w-full px-3 py-2 border border-input rounded-md bg-background"
               >
                 <option value="">All Statuses</option>
@@ -142,7 +144,7 @@ export default async function ContractsPage({
               <select
                 id="customerType"
                 name="customerType"
-                defaultValue={searchParams.customerType || ""}
+                defaultValue={resolvedParams.customerType || ""}
                 className="w-full px-3 py-2 border border-input rounded-md bg-background"
               >
                 <option value="">All Types</option>
@@ -159,7 +161,7 @@ export default async function ContractsPage({
               <select
                 id="customer"
                 name="customer"
-                defaultValue={searchParams.customer || ""}
+                defaultValue={resolvedParams.customer || ""}
                 className="w-full px-3 py-2 border border-input rounded-md bg-background"
               >
                 <option value="">All Customers</option>
@@ -179,7 +181,7 @@ export default async function ContractsPage({
               <select
                 id="coveragePlan"
                 name="coveragePlan"
-                defaultValue={searchParams.coveragePlan || ""}
+                defaultValue={resolvedParams.coveragePlan || ""}
                 className="w-full px-3 py-2 border border-input rounded-md bg-background"
               >
                 <option value="">All Plans</option>
@@ -221,7 +223,7 @@ export default async function ContractsPage({
             currentView={viewMode}
             currentPath="/manager/contracts"
             currentSearchParams={Object.fromEntries(
-              Object.entries(searchParams).filter(([_, v]) => v !== undefined) as [string, string][],
+              Object.entries(resolvedParams).filter(([_, v]) => v !== undefined) as [string, string][],
             )}
           />
         </CardHeader>
@@ -289,7 +291,7 @@ export default async function ContractsPage({
                   <div className="flex gap-2">
                     {page > 1 && (
                       <Link
-                        href={`/manager/contracts?${new URLSearchParams({ ...(searchParams as any), page: String(page - 1) }).toString()}`}
+                        href={`/manager/contracts?${new URLSearchParams({ ...(resolvedParams as any), page: String(page - 1) }).toString()}`}
                       >
                         <Button variant="outline" size="sm">
                           Previous
@@ -301,7 +303,7 @@ export default async function ContractsPage({
                     </span>
                     {page < totalPages && (
                       <Link
-                        href={`/manager/contracts?${new URLSearchParams({ ...(searchParams as any), page: String(page + 1) }).toString()}`}
+                        href={`/manager/contracts?${new URLSearchParams({ ...(resolvedParams as any), page: String(page + 1) }).toString()}`}
                       >
                         <Button variant="outline" size="sm">
                           Next
