@@ -95,7 +95,7 @@ export default async function ContractsPage({
     .eq("organization_id", user.organization_id)
     .eq("is_active", true)
     .order("company_name", { ascending: true, nullsFirst: false })
-    .limit(100)
+    .limit(500)
 
   const statuses = ["in_progress", "job_creation_needed", "renewal_needed", "on_hold", "cancelled", "overdue"]
   const coveragePlans = ["gold", "remedial", "pm_contract", "pseudo_gold"]

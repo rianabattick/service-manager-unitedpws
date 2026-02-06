@@ -53,15 +53,21 @@ export async function listContracts(params: {
 > {
   const supabase = await createClient()
 
+  // 1. DYNAMIC JOIN LOGIC
+  // If filtering by customerType, we append "!inner" to the foreign key.
+  // This forces Supabase to ONLY return contracts that have a matching customer type.
+  const joinModifier = params.customerType ? "!inner" : ""
+
   let query = supabase
     .from("service_agreements")
     .select(`
       *,
-      customer:customers!service_agreements_customer_id_fkey (
+      customer:customers!service_agreements_customer_id_fkey${joinModifier} (
         id,
         first_name,
         last_name,
-        company_name
+        company_name,
+        customer_type
       ),
       vendor:vendors!service_agreements_vendor_id_fkey (
         id,
@@ -70,13 +76,20 @@ export async function listContracts(params: {
     `)
     .eq("organization_id", params.organizationId)
 
-  // Apply filters
+  // 2. Apply Filters
+  if (params.customerType) {
+    // This filter now works because of the !inner join above
+    query = query.eq("customer.customer_type", params.customerType)
+  }
+
   if (params.status) {
     query = query.eq("status", params.status)
   }
+
   if (params.customerId) {
     query = query.eq("customer_id", params.customerId)
   }
+
   if (params.coveragePlan) {
     query = query.eq("type", params.coveragePlan)
   }
@@ -87,6 +100,7 @@ export async function listContracts(params: {
     query = query.not("status", "in", "(ended,cancelled)")
   }
 
+  // 3. Sort & Execute
   query = query.order("created_at", { ascending: false })
 
   const { data: contracts, error } = await query
@@ -98,7 +112,7 @@ export async function listContracts(params: {
 
   if (!contracts || contracts.length === 0) return []
 
-  // Get services for each contract
+  // 4. Fetch Services
   const contractIds = contracts.map((c: any) => c.id)
   const { data: services } = await supabase.from("contract_services").select("*").in("contract_id", contractIds)
 
@@ -338,6 +352,10 @@ export async function updateContract(
     .select("organization_id, agreement_number, name")
     .eq("id", contractId)
     .single()
+  
+  if (!contract) {
+    throw new Error("Contract not found")
+  }
 
   // Update contract
   const updateData: any = {}

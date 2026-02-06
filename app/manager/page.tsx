@@ -38,7 +38,7 @@ export default async function ManagerDashboard() {
     .from("service_agreements")
     .select("*", { count: "exact", head: true })
     .eq("organization_id", user.organization_id)
-    .in("status", ["active", "job_creation_needed"])
+    .neq("status", "cancelled") // 👈 CHANGED: Counts everything EXCEPT 'cancelled'
 
   // Calculate KPIs
   const activeJobsCount = jobs.filter((j) => j.status !== "completed").length
@@ -54,7 +54,7 @@ export default async function ManagerDashboard() {
   const overdueJobs = jobs
     .filter(
       (j) =>
-        j.status === "overdue" ||
+        j.status as string === "overdue" ||
         (j.scheduled_start &&
           new Date(j.scheduled_start) < new Date(Date.now() - 2 * 24 * 60 * 60 * 1000) &&
           !["completed", "cancelled"].includes(j.status)),
@@ -149,7 +149,7 @@ export default async function ManagerDashboard() {
                 <p className="text-muted-foreground text-sm">No overdue jobs</p>
               ) : (
                 <div className="space-y-4">
-                  {overdueJobs.map((job) => (
+                  {overdueJobs.map((job:any) => (
                     <Link
                       key={job.id}
                       href={`/manager/jobs/${job.id}`}

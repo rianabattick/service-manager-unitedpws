@@ -101,7 +101,7 @@ export default async function ManagerJobsPage({
     .eq("organization_id", user.organization_id)
     .eq("is_active", true)
     .order("company_name", { ascending: true, nullsFirst: false })
-    .limit(100)
+    .limit(500)
 
   const { data: technicians } = await supabase
     .from("users")
