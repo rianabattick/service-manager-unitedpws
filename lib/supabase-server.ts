@@ -16,7 +16,12 @@ export async function createClient(): Promise<SupabaseClient> {
         return cookieStore.getAll()
       },
       setAll(cookiesToSet) {
-        cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options))
+        // 👇 The Fix: Wrap in try/catch to prevent Server Component crashes
+        try {
+          cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options))
+        } catch {
+          // Ignored: Server Component cannot set cookies.
+        }
       },
     },
   })

@@ -3,7 +3,7 @@ import { getCurrentUser } from "@/lib/db"
 import { createClient } from "@/lib/supabase-server"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
-import { ArrowLeft, Eye, FileText } from "lucide-react" // Added FileText icon for styling match
+import { ArrowLeft, FileText, Download } from "lucide-react" // Added FileText icon for styling match
 import { Button } from "@/components/ui/button"
 
 export default async function ManagerReportsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -145,10 +145,14 @@ export default async function ManagerReportsPage({ params }: { params: Promise<{
 
                         {/* View Button - Kept exactly as you wanted */}
                         <div className="flex items-center gap-2 shrink-0">
-                          <a href={report.file_url} target="_blank" rel="noopener noreferrer">
+                          <a 
+                            href={`${report.file_url}?download=${encodeURIComponent(report.file_name)}`} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                          >
                             <Button variant="outline" size="sm">
-                              <Eye className="w-4 h-4 mr-1" />
-                              View
+                              <Download className="w-4 h-4 mr-1" />
+                              Download
                             </Button>
                           </a>
                         </div>
