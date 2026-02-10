@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Textarea } from "@/components/ui/textarea"
 import { useState } from "react"
-import { updateReturnTripDecision } from "./return-trip-actions"
+import { updateReturnTripDecision } from "./return-trip-actions" // Make sure path is correct
 import { useToast } from "@/hooks/use-toast"
 
 interface ReturnTripManagerProps {
@@ -26,6 +26,7 @@ export function ReturnTripManager({ jobId, initialNeeded, initialReason }: Retur
     setNeeded(newValue)
     setIsSaving(true)
 
+    // Pass the CURRENT 'reason' state
     const result = await updateReturnTripDecision(jobId, newValue, reason)
 
     setIsSaving(false)
@@ -42,34 +43,36 @@ export function ReturnTripManager({ jobId, initialNeeded, initialReason }: Retur
         variant: "destructive",
       })
       // Revert on error
-      setNeeded(needed === value ? null : value)
+      setNeeded(needed) 
     }
   }
 
-  const handleReasonChange = async (newReason: string) => {
-    setReason(newReason)
+  // 1. Only update LOCAL state while typing (Instant, no lag)
+  const handleReasonChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setReason(e.target.value)
+  }
 
-    // Auto-save after a short debounce
-    const timeoutId = setTimeout(async () => {
-      setIsSaving(true)
-      const result = await updateReturnTripDecision(jobId, needed, newReason)
-      setIsSaving(false)
+  // 2. Save to Server ONLY when user clicks away
+  const handleBlur = async () => {
+    // Optional: Prevent saving if nothing changed (optimization)
+    if (reason === initialReason && needed === initialNeeded) return
 
-      if (result.success) {
-        toast({
-          title: "Saved",
-          description: "Return trip reason updated",
-        })
-      } else {
-        toast({
-          title: "Error",
-          description: result.error || "Failed to save reason",
-          variant: "destructive",
-        })
-      }
-    }, 1000)
+    setIsSaving(true)
+    const result = await updateReturnTripDecision(jobId, needed, reason)
+    setIsSaving(false)
 
-    return () => clearTimeout(timeoutId)
+    if (result.success) {
+      toast({
+        title: "Saved",
+        description: "Return trip reason updated",
+      })
+    } else {
+      toast({
+        title: "Error",
+        description: result.error || "Failed to save reason",
+        variant: "destructive",
+      })
+    }
   }
 
   const showWarning = needed === true && !reason.trim()
@@ -116,7 +119,8 @@ export function ReturnTripManager({ jobId, initialNeeded, initialReason }: Retur
             <Textarea
               id="return-trip-reason"
               value={reason}
-              onChange={(e) => handleReasonChange(e.target.value)}
+              onChange={handleReasonChange} // 👈 Fast local update
+              onBlur={handleBlur}          // 👈 Save only when done
               placeholder="Add context for why a return trip is / isn't needed…"
               className="min-h-[100px]"
               disabled={isSaving}
