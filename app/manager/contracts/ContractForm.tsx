@@ -14,7 +14,12 @@ import { VendorSelect } from "@/components/shared/VendorSelect"
 import { createContract, updateContract, type Contract } from "@/lib/contracts"
 
 interface ContractFormProps {
-  contract?: Contract & { services?: any[] }
+  // We extend the type slightly to ensure TS knows about the snake_case properties coming from the DB
+  contract?: Contract & { 
+    services?: any[]; 
+    unit_information?: string; 
+    pm_due_next?: string; 
+  }
   customers: Array<{ id: string; name: string; company_name?: string; first_name?: string; last_name?: string }>
   organizationId: string
   userId: string
@@ -74,11 +79,14 @@ export function ContractForm({
   const [vendorId, setVendorId] = useState<string | undefined>(contract?.vendor_id || undefined)
   const [title, setTitle] = useState(contract?.name || "")
   const [coveragePlan, setCoveragePlan] = useState(contract?.type || "")
-  const [agreementLengthYears, setAgreementLengthYears] = useState(1)
+  const [agreementLengthYears, setAgreementLengthYears] = useState(contract?.agreement_length_years || 1)
   const [startDate, setStartDate] = useState(contract?.start_date || "")
   const [endDate, setEndDate] = useState(contract?.end_date || "")
-  const [pmDueNext, setPmDueNext] = useState("")
-  const [unitInformation, setUnitInformation] = useState("")
+  
+  // 👇 FIXED: Initialize with contract data (snake_case from DB)
+  const [pmDueNext, setPmDueNext] = useState(contract?.pm_due_next || "")
+  const [unitInformation, setUnitInformation] = useState(contract?.unit_information || "")
+  
   const [notes, setNotes] = useState(contract?.notes || "")
   const [status, setStatus] = useState(contract?.status || "job_creation_needed")
   const [billingType, setBillingType] = useState(contract?.billing_type || "due_on_receipt")
