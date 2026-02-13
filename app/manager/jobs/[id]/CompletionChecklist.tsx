@@ -25,8 +25,9 @@ export function CompletionChecklist({
     reports_sent_to_customer: false,
     reports_saved_in_file: false,
     invoiced: false,
-    // Removed: no_pending_return_visits
     parts_logistics_completed: false,
+    // 👇 ADDED BACK: Kept in state to satisfy TypeScript/DB, but hidden from UI
+    no_pending_return_visits: false, 
   })
   const [isLoading, setIsLoading] = useState(true)
   const [completionInfo, setCompletionInfo] = useState<{
@@ -34,6 +35,7 @@ export function CompletionChecklist({
     completedAt?: string
   } | null>(null)
 
+  // 1. Load initial data
   useEffect(() => {
     async function loadData() {
       const result = await loadChecklist(jobId)
@@ -43,8 +45,9 @@ export function CompletionChecklist({
           reports_sent_to_customer: result.data.reports_sent_to_customer,
           reports_saved_in_file: result.data.reports_saved_in_file,
           invoiced: result.data.invoiced,
-          // Removed: no_pending_return_visits from data load
           parts_logistics_completed: result.data.parts_logistics_completed,
+          // Load this too so we don't accidentally overwrite it with false
+          no_pending_return_visits: result.data.no_pending_return_visits, 
         })
         if (result.data.completed_by && result.data.completed_at) {
           setCompletionInfo({
@@ -58,36 +61,62 @@ export function CompletionChecklist({
     loadData()
   }, [jobId])
 
-  // Auto-check based on props
+  // 2. Auto-check based on props
   useEffect(() => {
-    if (!isLoading) {
-      const reportsAutoChecked = totalReports > 0 && uploadedReports >= totalReports
-      const invoicedAutoChecked =
-        billingStatus === "invoiced" || billingStatus === "paid" || billingStatus === "un_billable"
+    if (isLoading) return
 
-      setChecklist((prev) => {
-        if (prev.reports_uploaded !== reportsAutoChecked || prev.invoiced !== invoicedAutoChecked) {
-          const updated = {
-            ...prev,
-            reports_uploaded: reportsAutoChecked,
-            invoiced: invoicedAutoChecked,
-          }
-          // Persist the auto-checked values
-          updateChecklist(jobId, updated, currentStatus)
-          return updated
-        }
-        return prev
-      })
+    // Logic: If 0 expected reports, consider it complete (Auto-check true)
+    const reportsAutoChecked = totalReports === 0 || uploadedReports >= totalReports
+    
+    const invoicedAutoChecked =
+      billingStatus === "invoiced" || billingStatus === "paid" || billingStatus === "un_billable"
+
+    // Only update if the current state doesn't match the desired auto-state
+    const needsUpdate = 
+      checklist.reports_uploaded !== reportsAutoChecked ||
+      checklist.invoiced !== invoicedAutoChecked
+
+    if (needsUpdate) {
+      const updatedChecklist = {
+        ...checklist,
+        reports_uploaded: reportsAutoChecked,
+        invoiced: invoicedAutoChecked,
+      }
+
+      // Update UI
+      setChecklist(updatedChecklist)
+
+      // Update Database
+      updateChecklist(jobId, updatedChecklist, currentStatus)
     }
-  }, [totalReports, uploadedReports, billingStatus, isLoading, jobId, currentStatus])
+  }, [
+    totalReports, 
+    uploadedReports, 
+    billingStatus, 
+    isLoading, 
+    jobId, 
+    currentStatus, 
+    checklist.reports_uploaded,
+    checklist.invoiced,
+    checklist
+  ])
 
-  // This will now return TRUE even if the return trip field (which is gone) was false
-  const allCompleted = Object.values(checklist).every((v) => v)
+  // Check if everything (EXCEPT the hidden field) is true
+  // We filter out 'no_pending_return_visits' from the validation check if you want to ignore it,
+  // OR if it's still required by the system, we leave it. 
+  // Assuming we want to ignore the hidden field for completion:
+  const visibleChecklistItems = {
+    reports_uploaded: checklist.reports_uploaded,
+    reports_sent_to_customer: checklist.reports_sent_to_customer,
+    reports_saved_in_file: checklist.reports_saved_in_file,
+    invoiced: checklist.invoiced,
+    parts_logistics_completed: checklist.parts_logistics_completed,
+  }
+  const allCompleted = Object.values(visibleChecklistItems).every((v) => v)
 
   const handleCheckChange = async (key: keyof typeof checklist, checked: boolean) => {
     const updatedChecklist = { ...checklist, [key]: checked }
     setChecklist(updatedChecklist)
-
     await updateChecklist(jobId, updatedChecklist, currentStatus)
   }
 
@@ -116,10 +145,10 @@ export function CompletionChecklist({
               id="reports_uploaded"
               checked={checklist.reports_uploaded}
               onCheckedChange={(checked) => handleCheckChange("reports_uploaded", checked as boolean)}
-              disabled={totalReports > 0 && uploadedReports >= totalReports}
+              disabled={totalReports === 0 || uploadedReports >= totalReports}
             />
             <label htmlFor="reports_uploaded" className="text-sm cursor-pointer leading-none peer-disabled:opacity-70">
-              Reports uploaded
+              Reports uploaded {totalReports === 0 && <span className="text-muted-foreground ml-1">(N/A)</span>}
             </label>
           </div>
 
@@ -162,8 +191,6 @@ export function CompletionChecklist({
               Invoiced / Paid / Un-billable
             </label>
           </div>
-
-          {/* "No pending return visits" Checkbox removed from here */}
 
           <div className="flex items-start gap-3">
             <Checkbox

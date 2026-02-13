@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { getCurrentUser, listTechnicianJobs } from "@/lib/db"
+import { getCurrentUser, listTechnicianJobsDetailed } from "@/lib/db"
+import { createClient } from "@/lib/supabase-server"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { PageHeader } from "@/components/shared/PageHeader"
 
@@ -17,11 +18,34 @@ export default async function TechnicianDashboardPage() {
     redirect("/manager")
   }
 
-  const allJobs = await listTechnicianJobs(user.id)
+  const supabase = await createClient()
 
+  // 1. Get Detailed jobs to see equipment list
+  const allJobs = await listTechnicianJobsDetailed(user.id)
   const jobs = allJobs.filter((j) => j.status !== "completed")
 
-  // Calculate KPIs
+  // 2. Fetch ALL attachments for these jobs to calculate KPI accurately
+  // We need to know exactly WHICH units have files to count "Units Completed" vs "Total Files"
+  const activeJobIds = jobs.map(j => j.job_id);
+  
+  // Safe check: only query if we have active jobs
+  let allAttachments: any[] = [];
+  if (activeJobIds.length > 0) {
+    const { data } = await supabase
+      .from("job_attachments")
+      .select("job_id, equipment_id")
+      .in("job_id", activeJobIds)
+      .in("type", ["photo", "document"]);
+    allAttachments = data || [];
+  }
+
+  // Create a Set of "Completed Unit Keys" for fast lookup
+  // Key format: "jobId_equipmentId"
+  const completedUnitKeys = new Set(
+    allAttachments.map(a => `${a.job_id}_${a.equipment_id}`)
+  );
+
+  // --- Calculate KPIs ---
   const totalActiveJobs = jobs.length
 
   const today = new Date()
@@ -30,45 +54,72 @@ export default async function TechnicianDashboardPage() {
   tomorrow.setDate(tomorrow.getDate() + 1)
 
   const todaysJobs = jobs.filter((j) => {
-    if (!j.scheduled_start) return false
-    const jobDate = new Date(j.scheduled_start)
+    if (!j.scheduled_at) return false
+    const jobDate = new Date(j.scheduled_at)
     return jobDate >= today && jobDate < tomorrow
   })
 
-  const totalExpectedReports = jobs.reduce((sum, j) => sum + j.total_expected_reports, 0)
-  const totalReportsUploaded = jobs.reduce((sum, j) => sum + j.total_reports_uploaded, 0)
-  const reportProgress = totalExpectedReports > 0 ? Math.round((totalReportsUploaded / totalExpectedReports) * 100) : 0
+  // Count TOTAL units
+  const totalUnitsAllJobs = jobs.reduce((sum, j) => sum + (j.equipment?.length || 0), 0)
+  
+  // Count COMPLETED units (lookup in our Set)
+  const totalUnitsCompleted = jobs.reduce((sum, j) => {
+    const completedInJob = j.equipment?.filter((u:any) => {
+       const unitId = u.id || u.equipment_id;
+       return completedUnitKeys.has(`${j.job_id}_${unitId}`)
+    }).length || 0
+    return sum + completedInJob
+  }, 0)
 
-  // Filter for upcoming jobs (next 7 days)
+  // Report Progress: If 0 total units, we consider it 100% complete
+  const reportProgress = totalUnitsAllJobs > 0 
+    ? Math.round((totalUnitsCompleted / totalUnitsAllJobs) * 100) 
+    : 100;
+
+  // Filter upcoming jobs (Next 7 days)
   const sevenDaysFromNow = new Date()
   sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7)
 
   const upcomingJobs = jobs
     .filter((j) => {
-      if (!j.scheduled_start) return false
-      const jobDate = new Date(j.scheduled_start)
+      if (!j.scheduled_at) return false
+      const jobDate = new Date(j.scheduled_at)
       return jobDate >= tomorrow && jobDate <= sevenDaysFromNow
     })
-    .sort((a, b) => new Date(a.scheduled_start!).getTime() - new Date(b.scheduled_start!).getTime())
+    .sort((a, b) => new Date(a.scheduled_at!).getTime() - new Date(b.scheduled_at!).getTime())
     .slice(0, 5)
 
   // Sort today's jobs by time
   const sortedTodaysJobs = todaysJobs
-    .sort((a, b) => new Date(a.scheduled_start!).getTime() - new Date(b.scheduled_start!).getTime())
+    .sort((a, b) => new Date(a.scheduled_at!).getTime() - new Date(b.scheduled_at!).getTime())
     .slice(0, 3)
 
-  // Calculate reporting summary
-  const jobsFullyReported = jobs.filter(
-    (j) => j.total_expected_reports > 0 && j.total_reports_uploaded >= j.total_expected_reports,
-  ).length
+  // Calc Summary: Jobs Fully Reported vs Missing
+  const jobsFullyReported = jobs.filter((j) => {
+    const totalUnits = j.equipment?.length || 0
+    // If 0 units, it IS fully reported (Auto-Green)
+    if (totalUnits === 0) return true;
 
-  const jobsWithMissingReports = jobs.filter(
-    (j) => j.total_expected_reports > 0 && j.total_reports_uploaded < j.total_expected_reports,
-  ).length
+    const completedInJob = j.equipment?.filter((u:any) => {
+       const unitId = u.id || u.equipment_id;
+       return completedUnitKeys.has(`${j.job_id}_${unitId}`)
+    }).length || 0
+    return completedInJob >= totalUnits
+  }).length
+
+  const jobsWithMissingReports = jobs.filter((j) => {
+    const totalUnits = j.equipment?.length || 0
+    if (totalUnits === 0) return false; // Not missing anything if 0 units
+
+    const completedInJob = j.equipment?.filter((u:any) => {
+       const unitId = u.id || u.equipment_id;
+       return completedUnitKeys.has(`${j.job_id}_${unitId}`)
+    }).length || 0
+    return completedInJob < totalUnits
+  }).length
 
   return (
     <div className="space-y-8">
-      {/* Header */}
       <PageHeader title="Field Engineer Dashboard" subtitle="Overview of your assigned jobs and reporting status." />
 
       {/* KPI Cards */}
@@ -98,9 +149,9 @@ export default async function TechnicianDashboardPage() {
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Reports Progress</p>
               <p className="text-3xl font-bold">
-                {totalReportsUploaded} / {totalExpectedReports}
+                {totalUnitsCompleted} / {totalUnitsAllJobs}
               </p>
-              <p className="text-xs text-muted-foreground mb-2">Reports uploaded across all jobs</p>
+              <p className="text-xs text-muted-foreground mb-2">Units reported across all jobs</p>
               <div className="h-1.5 w-full bg-muted rounded-full">
                 <div className="h-1.5 bg-primary rounded-full transition-all" style={{ width: `${reportProgress}%` }} />
               </div>
@@ -109,7 +160,6 @@ export default async function TechnicianDashboardPage() {
         </Card>
       </div>
 
-      {/* Main Layout: Today's Jobs + Upcoming Jobs | Reporting Summary + Quick Links */}
       <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         {/* Left column */}
         <div className="space-y-6">
@@ -129,30 +179,38 @@ export default async function TechnicianDashboardPage() {
                 <p className="text-sm text-muted-foreground">No jobs scheduled for today.</p>
               ) : (
                 <div className="space-y-4">
-                  {sortedTodaysJobs.map((job) => (
-                    <div key={job.id} className="flex items-center justify-between py-3 border-b last:border-0">
-                      <div>
-                        <Link
-                          href={`/technician/jobs/${job.id}`}
-                          className="font-mono text-sm text-primary hover:underline"
-                        >
-                          {job.title || job.job_number}
-                        </Link>
-                        <p className="text-sm font-medium">{job.customer_name}</p>
-                        <p className="text-xs text-muted-foreground">{job.location_name ?? "Location not set"}</p>
+                  {sortedTodaysJobs.map((job) => {
+                     const totalUnits = job.equipment?.length || 0;
+                     const completedUnits = job.equipment?.filter((u:any) => {
+                        const unitId = u.id || u.equipment_id;
+                        return completedUnitKeys.has(`${job.job_id}_${unitId}`)
+                     }).length || 0;
+
+                     return (
+                      <div key={job.job_id} className="flex items-center justify-between py-3 border-b last:border-0">
+                        <div>
+                          <Link
+                            href={`/technician/jobs/${job.job_id}`}
+                            className="font-mono text-sm text-primary hover:underline"
+                          >
+                            {job.title || job.job_number}
+                          </Link>
+                          <p className="text-sm font-medium">{job.customer_name}</p>
+                          <p className="text-xs text-muted-foreground">{job.location_name ?? "Location not set"}</p>
+                        </div>
+                        <div className="text-right space-y-1">
+                          <span
+                            className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${getStatusClasses(job.status)}`}
+                          >
+                            {formatStatus(job.status)}
+                          </span>
+                          <p className="text-xs text-muted-foreground">
+                            {completedUnits} / {totalUnits} units
+                          </p>
+                        </div>
                       </div>
-                      <div className="text-right space-y-1">
-                        <span
-                          className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${getStatusClasses(job.status)}`}
-                        >
-                          {formatStatus(job.status)}
-                        </span>
-                        <p className="text-xs text-muted-foreground">
-                          {job.total_reports_uploaded} / {job.total_expected_reports} reports
-                        </p>
-                      </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </CardContent>
@@ -169,33 +227,41 @@ export default async function TechnicianDashboardPage() {
                 <p className="text-sm text-muted-foreground">No upcoming jobs in the next week.</p>
               ) : (
                 <div className="space-y-4">
-                  {upcomingJobs.map((job) => (
-                    <div key={job.id} className="flex items-center justify-between py-3 border-b last:border-0">
-                      <div>
-                        <Link
-                          href={`/technician/jobs/${job.id}`}
-                          className="font-mono text-sm text-primary hover:underline"
-                        >
-                          {job.title || job.job_number}
-                        </Link>
-                        <p className="text-sm font-medium">{job.customer_name}</p>
-                        <p className="text-xs text-muted-foreground">{job.location_name ?? "Location not set"}</p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {job.scheduled_start ? formatDateTime(job.scheduled_start) : "Not scheduled"}
-                        </p>
+                  {upcomingJobs.map((job) => {
+                     const totalUnits = job.equipment?.length || 0;
+                     const completedUnits = job.equipment?.filter((u:any) => {
+                        const unitId = u.id || u.equipment_id;
+                        return completedUnitKeys.has(`${job.job_id}_${unitId}`)
+                     }).length || 0;
+
+                     return (
+                      <div key={job.job_id} className="flex items-center justify-between py-3 border-b last:border-0">
+                        <div>
+                          <Link
+                            href={`/technician/jobs/${job.job_id}`}
+                            className="font-mono text-sm text-primary hover:underline"
+                          >
+                            {job.title || job.job_number}
+                          </Link>
+                          <p className="text-sm font-medium">{job.customer_name}</p>
+                          <p className="text-xs text-muted-foreground">{job.location_name ?? "Location not set"}</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {job.scheduled_at ? formatDateTime(job.scheduled_at) : "Not scheduled"}
+                          </p>
+                        </div>
+                        <div className="text-right space-y-1">
+                          <span
+                            className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${getStatusClasses(job.status)}`}
+                          >
+                            {formatStatus(job.status)}
+                          </span>
+                          <p className="text-xs text-muted-foreground">
+                            {completedUnits} / {totalUnits} units
+                          </p>
+                        </div>
                       </div>
-                      <div className="text-right space-y-1">
-                        <span
-                          className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${getStatusClasses(job.status)}`}
-                        >
-                          {formatStatus(job.status)}
-                        </span>
-                        <p className="text-xs text-muted-foreground">
-                          {job.total_reports_uploaded} / {job.total_expected_reports} reports
-                        </p>
-                      </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </CardContent>
@@ -211,9 +277,9 @@ export default async function TechnicianDashboardPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <p className="text-sm text-muted-foreground mb-1">Reports uploaded</p>
-                <p className="text-2xl font-bold">{totalReportsUploaded}</p>
-                <p className="text-xs text-muted-foreground">out of {totalExpectedReports}</p>
+                <p className="text-sm text-muted-foreground mb-1">Units reported</p>
+                <p className="text-2xl font-bold">{totalUnitsCompleted}</p>
+                <p className="text-xs text-muted-foreground">out of {totalUnitsAllJobs} total units</p>
               </div>
 
               <div className="space-y-2 pt-2 border-t">
@@ -293,8 +359,11 @@ function getStatusClasses(status: string): string {
 
 function formatDateTime(dateString: string): string {
   const date = new Date(dateString)
-  const month = date.toLocaleDateString("en-US", { month: "short" })
-  const day = date.getDate()
-  const time = date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })
-  return `${month} ${day}, ${time}`
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true
+  })
 }

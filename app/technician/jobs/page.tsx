@@ -66,6 +66,15 @@ export default async function TechnicianJobsPage({
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
   const paginatedJobs = jobs.slice(startIndex, startIndex + ITEMS_PER_PAGE)
 
+  // 1. Fetch attachments for these specific jobs
+  const jobIds = paginatedJobs.map((j) => j.job_id)
+  
+  const { data: attachments } = await supabase
+    .from("job_attachments")
+    .select("job_id, equipment_id")
+    .in("job_id", jobIds)
+    .in("type", ["photo", "document"])
+
   const { data: customers } = await supabase
     .from("customers")
     .select("id, first_name, last_name, company_name")
@@ -74,7 +83,10 @@ export default async function TechnicianJobsPage({
     .order("company_name", { ascending: true, nullsFirst: false })
     .limit(100)
 
-  const statuses = ["pending", "confirmed", "completed", "cancelled", "on_hold", "overdue"]
+  // 👇 CREATE SANITIZED PARAMS (Fixes TypeScript error in child components)
+  const sanitizedParams = Object.fromEntries(
+    Object.entries(params).filter(([_, v]) => v !== undefined)
+  ) as Record<string, string>
 
   return (
     <div className="space-y-6">
@@ -94,13 +106,11 @@ export default async function TechnicianJobsPage({
                 className="w-full px-3 py-2 border border-input rounded-md bg-background"
               >
                 <option value="">All Statuses</option>
-                {statuses
-                  .filter((s) => s !== "completed")
-                  .map((s) => (
-                    <option key={s} value={s}>
-                      {s.replace("_", " ")}
-                    </option>
-                  ))}
+                {["pending", "confirmed", "on_hold", "overdue", "cancelled"].map((s) => (
+                  <option key={s} value={s}>
+                    {s.replace("_", " ")}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -175,9 +185,7 @@ export default async function TechnicianJobsPage({
           <JobsViewToggle
             currentView={viewMode}
             currentPath="/technician/jobs"
-            currentSearchParams={Object.fromEntries(
-              Object.entries(params).filter(([_, v]) => v !== undefined) as [string, string][],
-            )}
+            currentSearchParams={sanitizedParams} // 👈 Updated to use sanitizedParams
           />
         </CardHeader>
         <CardContent>
@@ -201,57 +209,71 @@ export default async function TechnicianJobsPage({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {paginatedJobs.map((job) => (
-                      <tr key={job.job_id} className="hover:bg-muted/50">
-                        <td className="py-3 pr-6">
-                          <Link
-                            href={`/technician/jobs/${job.job_id}`}
-                            className="text-primary hover:underline font-medium"
-                          >
-                            {job.title || `Job #${job.job_number}`}
-                          </Link>
-                        </td>
-                        <td className="py-3 pr-6">{job.customer_name}</td>
-                        <td className="py-3 pr-6 text-muted-foreground">{job.location_name || "—"}</td>
-                        <td className="py-3 pr-6">
-                          <span
-                            className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(
-                              job.status,
-                            )}`}
-                          >
-                            {formatStatus(job.status)}
-                          </span>
-                        </td>
-                        <td className="py-3 pr-6 text-muted-foreground">
-                          {job.scheduled_at
-                            ? new Date(job.scheduled_at).toLocaleDateString("en-US", {
-                                weekday: "short",
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                                hour: "numeric",
-                                minute: "2-digit",
-                              })
-                            : "Not scheduled"}
-                        </td>
-                        <td className="py-3 pr-6 text-muted-foreground">
-                          {job.equipment.length > 0
-                            ? `${job.equipment.length} ${job.equipment.length === 1 ? "unit" : "units"}`
-                            : "—"}
-                        </td>
-                        <td className="py-3">
-                          <span
-                            className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                              job.report_progress.completed_reports >= job.report_progress.total_units
-                                ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
-                                : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
-                            }`}
-                          >
-                            {job.report_progress.completed_reports} / {job.report_progress.total_units}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
+                    {paginatedJobs.map((job) => {
+                      const totalUnits = job.equipment?.length || 0;
+                      
+                      const jobAttachments = attachments?.filter(a => a.job_id === job.job_id) || [];
+
+                      const unitsCompleted = job.equipment?.filter((u: any) => {
+                        const unitId = u.id || u.equipment_id;
+                        return jobAttachments.some(a => a.equipment_id === unitId);
+                      }).length || 0;
+
+                      // 0/0 is now Green (Success)
+                      const isComplete = unitsCompleted >= totalUnits;
+
+                      return (
+                        <tr key={job.job_id} className="hover:bg-muted/50">
+                          <td className="py-3 pr-6">
+                            <Link
+                              href={`/technician/jobs/${job.job_id}`}
+                              className="text-primary hover:underline font-medium"
+                            >
+                              {job.title || `Job #${job.job_number}`}
+                            </Link>
+                          </td>
+                          <td className="py-3 pr-6">{job.customer_name}</td>
+                          <td className="py-3 pr-6 text-muted-foreground">{job.location_name || "—"}</td>
+                          <td className="py-3 pr-6">
+                            <span
+                              className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(
+                                job.status,
+                              )}`}
+                            >
+                              {formatStatus(job.status)}
+                            </span>
+                          </td>
+                          <td className="py-3 pr-6 text-muted-foreground">
+                            {job.scheduled_at
+                              ? new Date(job.scheduled_at).toLocaleDateString("en-US", {
+                                  weekday: "short",
+                                  month: "short",
+                                  day: "numeric",
+                                  year: "numeric",
+                                  hour: "numeric",
+                                  minute: "2-digit",
+                                })
+                              : "Not scheduled"}
+                          </td>
+                          <td className="py-3 pr-6 text-muted-foreground">
+                            {totalUnits > 0
+                              ? `${totalUnits} ${totalUnits === 1 ? "unit" : "units"}`
+                              : "—"}
+                          </td>
+                          <td className="py-3">
+                            <span
+                              className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                                isComplete
+                                  ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
+                                  : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                              }`}
+                            >
+                              {unitsCompleted} / {totalUnits}
+                            </span>
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -261,7 +283,7 @@ export default async function TechnicianJobsPage({
                     currentPage={currentPage}
                     totalPages={totalPages}
                     baseUrl="/technician/jobs"
-                    searchParams={params}
+                    searchParams={sanitizedParams} // 👈 Updated to use sanitizedParams
                   />
                 </div>
               )}

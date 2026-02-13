@@ -2,11 +2,10 @@ import { redirect, notFound } from "next/navigation"
 import { getCurrentUser, getJobDetail } from "@/lib/db"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, CheckCircle, CircleDashed } from "lucide-react" 
 import { getStatusColor, getTechnicianStatusColor } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/ui/button" // 👈 Restored Button import
 
-// Helper to format generic strings like "time_and_materials" -> "Time & Materials"
 function formatString(str: string | null) {
   if (!str) return "Not set"
   return str
@@ -16,7 +15,7 @@ function formatString(str: string | null) {
     .replace("And", "&")
 }
 
-export default async function TechnicianJobDetailPage({ params }: { params: { id: string } }) {
+export default async function TechnicianJobDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser()
 
   if (!user) {
@@ -27,20 +26,20 @@ export default async function TechnicianJobDetailPage({ params }: { params: { id
     redirect("/manager")
   }
 
-  const { id } = params
-
-  // Fetch complete job detail
+  const { id } = await params
   const jobDetail = await getJobDetail(id, user.organization_id)
 
   if (!jobDetail) {
     notFound()
   }
 
-  // ADDED: Destructure 'contacts' so we can use them
   const { job, technicians, units, contacts } = jobDetail
-
-  // Check if this technician is assigned to this job
   const technicianAssignment = technicians.find((t) => t.id === user.id)
+
+  // Logic: Calculate 'Units Completed' (Has at least 1 report)
+  const totalUnits = units.length
+  const completedUnits = units.filter((u) => u.reports_uploaded > 0).length
+  const jobProgressPercent = totalUnits > 0 ? (completedUnits / totalUnits) * 100 : 0
 
   return (
     <div className="space-y-6">
@@ -77,11 +76,9 @@ export default async function TechnicianJobDetailPage({ params }: { params: { id
         </div>
       </div>
 
-      {/* Main Layout: 2-column on desktop, stacked on mobile */}
       <div className="grid grid-cols-1 lg:grid-cols-[2fr_1.2fr] gap-6">
-        {/* Left Column */}
+        {/* Left Column - Job Details */}
         <div className="space-y-6">
-          {/* Basic Info Section */}
           <Card>
             <CardHeader>
               <CardTitle>Job Overview</CardTitle>
@@ -92,7 +89,6 @@ export default async function TechnicianJobDetailPage({ params }: { params: { id
                   <span className="text-sm text-muted-foreground">Company</span>
                   <p className="font-medium">{job.customer_name}</p>
                 </div>
-
                 <div>
                   <span className="text-sm text-muted-foreground">Customer Type</span>
                   <p className="font-medium">
@@ -101,15 +97,14 @@ export default async function TechnicianJobDetailPage({ params }: { params: { id
                     )}
                   </p>
                 </div>
-
                 {job.vendor_name && (
                   <div>
                     <span className="text-sm text-muted-foreground">Subcontracted By</span>
                     <p className="font-medium">{job.vendor_name}</p>
                   </div>
                 )}
-
-                {/* Site Address Logic */}
+                
+                {/* Site Locations */}
                 {job.site_locations && job.site_locations.length > 0 ? (
                   <div className="sm:col-span-2">
                     <span className="text-sm text-muted-foreground">Site Address(s)</span>
@@ -144,10 +139,10 @@ export default async function TechnicianJobDetailPage({ params }: { params: { id
                               </p>
                             )}
                             {site.notes && (
-                              <div className="ml-2 mt-2 p-2 bg-muted rounded text-xs">
-                                <p className="font-medium text-muted-foreground mb-1">Site Notes:</p>
-                                <p className="whitespace-pre-wrap">{site.notes}</p>
-                              </div>
+                                <div className="ml-2 mt-2 p-2 bg-muted rounded text-xs">
+                                  <p className="font-medium text-muted-foreground mb-1">Site Notes:</p>
+                                  <p className="whitespace-pre-wrap">{site.notes}</p>
+                                </div>
                             )}
                           </div>
                         ))
@@ -168,25 +163,18 @@ export default async function TechnicianJobDetailPage({ params }: { params: { id
                   <span className="text-sm text-muted-foreground">PO# / WO#</span>
                   <p className="font-medium">{job.po_number || "—"}</p>
                 </div>
-
                 <div>
                   <span className="text-sm text-muted-foreground">Estimate#</span>
                   <p className="font-medium">{job.estimate_number || "—"}</p>
                 </div>
-
                 <div>
                   <span className="text-sm text-muted-foreground">Job Type</span>
-                  {/* FIXED: Uses formatString to handle any value correctly */}
                   <p className="font-medium">{formatString(job.job_type)}</p>
                 </div>
-
                 <div>
                   <span className="text-sm text-muted-foreground">Service</span>
                   <p className="font-medium">{job.service_type || "Not set"}</p>
                 </div>
-
-                {/* Billing Status & Invoice # are hidden here */}
-
                 <div>
                   <span className="text-sm text-muted-foreground">Status</span>
                   <div>
@@ -197,7 +185,6 @@ export default async function TechnicianJobDetailPage({ params }: { params: { id
                     </span>
                   </div>
                 </div>
-
                 <div>
                   <span className="text-sm text-muted-foreground">Scheduled</span>
                   <p className="font-medium">
@@ -214,7 +201,6 @@ export default async function TechnicianJobDetailPage({ params }: { params: { id
                       : "Not scheduled"}
                   </p>
                 </div>
-
                 <div>
                   <span className="text-sm text-muted-foreground">Contract</span>
                   <p className="font-medium">
@@ -225,7 +211,6 @@ export default async function TechnicianJobDetailPage({ params }: { params: { id
                         : "No contract (daily job)"}
                   </p>
                 </div>
-
                 <div>
                   <span className="text-sm text-muted-foreground">Is Return Trip</span>
                   <p className="font-medium">{job.return_trip_needed ? "Yes" : "No"}</p>
@@ -234,7 +219,6 @@ export default async function TechnicianJobDetailPage({ params }: { params: { id
             </CardContent>
           </Card>
 
-          {/* Field Engineers Assigned Section */}
           <Card>
             <CardHeader>
               <CardTitle>Field Engineers Assigned</CardTitle>
@@ -273,7 +257,6 @@ export default async function TechnicianJobDetailPage({ params }: { params: { id
             </CardContent>
           </Card>
 
-          {/* ADDED: Point(s) of Contact Section */}
           <Card>
             <CardHeader>
               <CardTitle>Point(s) of Contact</CardTitle>
@@ -300,68 +283,79 @@ export default async function TechnicianJobDetailPage({ params }: { params: { id
           </Card>
         </div>
 
-        {/* Right Column */}
+        {/* Right Column - Units & Reports */}
         <div className="space-y-6">
-          {/* Units & Reports Section */}
           <Card>
-            <CardHeader>
-              <CardTitle>
+            <CardHeader className="pb-2">
+              <div className="flex flex-wrap items-center justify-between gap-4 mb-2">
+                
+                {/* 1. BUTTON (Restored) */}
                 <Link href={`/technician/jobs/${id}/reports`}>
-                  <Button variant="outline" className="justify-start bg-transparent px-4 text-xl font-semibold">
+                  <Button variant="outline" className="text-xl font-semibold h-auto py-2 px-6">
                     Units & Reports
                   </Button>
                 </Link>
-              </CardTitle>
+
+                {/* 2. PROGRESS TEXT (Outside the button) */}
+                <span className="text-sm font-medium text-muted-foreground bg-muted px-2 py-1 rounded-full">
+                   {completedUnits}/{totalUnits} Complete
+                </span>
+              </div>
+              
+              {/* Progress Bar */}
+              {totalUnits > 0 && (
+                <div className="w-full bg-muted rounded-full h-2">
+                  <div
+                    className="bg-primary h-2 rounded-full transition-all"
+                    style={{ width: `${jobProgressPercent}%` }}
+                  />
+                </div>
+              )}
             </CardHeader>
             <CardContent>
               {units.length === 0 ? (
                 <p className="text-muted-foreground text-sm">No units linked to this job yet.</p>
               ) : (
-                <div className="space-y-4">
-                  {units.map((unit) => (
-                    <div key={unit.equipment_id} className="space-y-2">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1">
-                          <p className="font-medium text-sm">{unit.equipment_name}</p>
-                          {unit.serial_number && (
-                            <p className="text-xs text-muted-foreground">SN#: {unit.serial_number}</p>
+                <div className="space-y-4 pt-2">
+                  {units.map((unit) => {
+                    const isUnitComplete = unit.reports_uploaded > 0;
+                    return (
+                      <div key={unit.equipment_id} className="space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1">
+                            <p className="font-medium text-sm">{unit.equipment_name}</p>
+                            {unit.serial_number && (
+                              <p className="text-xs text-muted-foreground">SN#: {unit.serial_number}</p>
+                            )}
+                            {(unit.make || unit.model) && (
+                              <p className="text-xs text-muted-foreground">
+                                {[unit.make, unit.model].filter(Boolean).join(" ")}
+                              </p>
+                            )}
+                            {unit.site_name && <p className="text-xs text-muted-foreground">Site: {unit.site_name}</p>}
+                          </div>
+                          
+                          {isUnitComplete ? (
+                            <CheckCircle className="w-5 h-5 text-green-500 shrink-0" />
+                          ) : (
+                            <CircleDashed className="w-5 h-5 text-muted-foreground shrink-0" />
                           )}
-                          {(unit.make || unit.model) && (
-                            <p className="text-xs text-muted-foreground">
-                              {[unit.make, unit.model].filter(Boolean).join(" ")}
-                            </p>
-                          )}
-                          {unit.type && <p className="text-xs text-muted-foreground capitalize">{unit.type}</p>}
-                          {unit.site_name && <p className="text-xs text-muted-foreground">Site: {unit.site_name}</p>}
                         </div>
-                        <span className="text-xs text-muted-foreground whitespace-nowrap">
-                          {unit.reports_uploaded} / {unit.expected_reports} reports
-                        </span>
+                        
+                        {unit.unit_notes && (
+                          <div className="mt-1 p-1.5 bg-muted rounded text-xs">
+                            <p className="font-medium text-muted-foreground">Notes:</p>
+                            <p className="whitespace-pre-wrap">{unit.unit_notes}</p>
+                          </div>
+                        )}
                       </div>
-                      {unit.expected_reports > 0 && (
-                        <div className="w-full bg-muted rounded-full h-2">
-                          <div
-                            className="bg-primary h-2 rounded-full transition-all"
-                            style={{
-                              width: `${Math.min(100, (unit.reports_uploaded / unit.expected_reports) * 100)}%`,
-                            }}
-                          />
-                        </div>
-                      )}
-                      {unit.unit_notes && (
-                        <div className="mt-1 p-1.5 bg-muted rounded text-xs">
-                          <p className="font-medium text-muted-foreground">Notes:</p>
-                          <p className="whitespace-pre-wrap">{unit.unit_notes}</p>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </CardContent>
           </Card>
 
-          {/* Notes Section */}
           <Card>
             <CardHeader>
               <CardTitle>Notes</CardTitle>
