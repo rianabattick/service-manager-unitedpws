@@ -1,8 +1,9 @@
 import { redirect, notFound } from "next/navigation"
 import { getCurrentUser, getJobDetail } from "@/lib/db"
+import { createClient } from "@/lib/supabase-server"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, CheckCircle2, CircleDashed } from "lucide-react"
 import { getStatusColor, getTechnicianStatusColor } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { DeleteJobButton } from "./DeleteJobButton"
@@ -31,7 +32,7 @@ function getBillingStatusLabel(status: string | null) {
     case "un_billable": 
     case "un-billable":
     case "unbillable":
-      return "Un-billable" // Explicitly formatted with hyphen
+      return "Un-billable" 
     default:
       return formatString(status)
   }
@@ -39,6 +40,7 @@ function getBillingStatusLabel(status: string | null) {
 
 export default async function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
+  const supabase = await createClient()
 
   if (id === "new") return null
 
@@ -52,6 +54,23 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
   if (!jobDetail) notFound()
 
   const { job, technicians, units, contacts } = jobDetail
+
+  // Fetch Attachments for Progress Logic
+  const { data: attachments } = await supabase
+    .from("job_attachments")
+    .select("equipment_id")
+    .eq("job_id", id)
+    .in("type", ["photo", "document"])
+
+  // Calculate Overall Progress
+  const totalUnits = units.length
+  // Create a Set of equipment IDs that have at least one attachment
+  const completedUnitIds = new Set(attachments?.map((a) => a.equipment_id) || [])
+  const completedUnitsCount = units.filter((u) => completedUnitIds.has(u.id || u.equipment_id)).length
+  
+  // 0/0 is 100% complete
+  const progressPercent = totalUnits > 0 ? Math.round((completedUnitsCount / totalUnits) * 100) : 100
+  const isAllReported = totalUnits === 0 || completedUnitsCount >= totalUnits
 
   const isManager = ["owner", "admin", "manager", "dispatcher"].includes(user.role)
   const isTechnician = user.role === "technician"
@@ -136,7 +155,6 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
 
                 <div>
                   <span className="text-sm text-muted-foreground">Customer Type</span>
-                  {/* Checks for override first, then defaults to "Direct" if empty */}
                   <p className="font-medium">{formatString(job.customer_type || job.customer?.customer_type || (job.vendor_id ? "Subcontract" : "Direct"))}</p>
                 </div>
 
@@ -223,7 +241,6 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
                   <p className="font-medium">{job.service_type || "Not set"}</p>
                 </div>
 
-                {/* VISIBILITY CHECK: Only Managers see Billing Status and Invoice # */}
                 {isManager && (
                   <>
                     <div>
@@ -349,60 +366,65 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
 
         {/* Right Column */}
         <div className="space-y-6">
+          
           {/* Units & Reports Section */}
           <Card>
-            <CardHeader>
-              <CardTitle>
-                <Link href={`/manager/jobs/${id}/reports`}>
-                  <Button variant="outline" className="justify-start bg-transparent px-4 text-xl font-semibold">
-                    Units & Reports
-                  </Button>
-                </Link>
-              </CardTitle>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                {/* 👇 RESTORED BUTTON: Standard "Outline" variant for brightness */}
+                <CardTitle>
+                   <Link href={`/manager/jobs/${id}/reports`}>
+                      <Button variant="outline" className="text-lg font-semibold">
+                        Units & Reports
+                      </Button>
+                   </Link>
+                </CardTitle>
+                <span className={`text-xs font-medium px-2 py-1 rounded-full ${
+                   isAllReported 
+                    ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300" 
+                    : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                }`}>
+                  {completedUnitsCount} / {totalUnits} Complete
+                </span>
+              </div>
+              {/* Progress Bar */}
+              <div className="h-2 w-full bg-muted rounded-full mt-2">
+                <div 
+                   className="h-2 bg-primary rounded-full transition-all" 
+                   style={{ width: `${progressPercent}%` }} 
+                />
+              </div>
             </CardHeader>
             <CardContent>
               {units.length === 0 ? (
                 <p className="text-muted-foreground text-sm">No units linked to this job yet.</p>
               ) : (
-                <div className="space-y-4">
-                  {units.map((unit) => (
-                    <div key={unit.equipment_id} className="space-y-2">
-                      <div className="flex items-start justify-between gap-2">
+                <div className="space-y-4 mt-2">
+                  {units.map((unit) => {
+                    const isReported = completedUnitIds.has(unit.equipment_id)
+                    return (
+                      <div key={unit.equipment_id} className="flex items-start justify-between border-b pb-3 last:border-0 last:pb-0">
                         <div className="flex-1">
                           <p className="font-medium text-sm">{unit.equipment_name}</p>
                           {unit.serial_number && (
-                            <p className="text-xs text-muted-foreground">SN#: {unit.serial_number}</p>
+                            <p className="text-xs text-muted-foreground">SN: {unit.serial_number}</p>
                           )}
-                          {(unit.make || unit.model) && (
-                            <p className="text-xs text-muted-foreground">
-                              {[unit.make, unit.model].filter(Boolean).join(" ")}
-                            </p>
+                          {unit.site_name && (
+                            <p className="text-xs text-muted-foreground">Site: {unit.site_name}</p>
                           )}
-                          {unit.type && <p className="text-xs text-muted-foreground capitalize">{unit.type}</p>}
-                          {unit.site_name && <p className="text-xs text-muted-foreground">Site: {unit.site_name}</p>}
                         </div>
-                        <span className="text-xs text-muted-foreground whitespace-nowrap">
-                          {unit.reports_uploaded} / {unit.expected_reports} reports
-                        </span>
+                        {/* Status Icon */}
+                        <div className="pt-1 pl-2">
+                           {isReported ? (
+                             <CheckCircle2 className="h-5 w-5 text-green-500" />
+                           ) : (
+                             // 👇 DOTTED GRAY CIRCLE (Pending)
+                             <CircleDashed className="h-5 w-5 text-muted-foreground" />
+                           )}
+                        </div>
                       </div>
-                      {unit.expected_reports > 0 && (
-                        <div className="w-full bg-muted rounded-full h-2">
-                          <div
-                            className="bg-primary h-2 rounded-full transition-all"
-                            style={{
-                              width: `${Math.min(100, (unit.reports_uploaded / unit.expected_reports) * 100)}%`,
-                            }}
-                          />
-                        </div>
-                      )}
-                      {unit.unit_notes && (
-                        <div className="mt-1 p-1.5 bg-muted rounded text-xs">
-                          <p className="font-medium text-muted-foreground">Notes:</p>
-                          <p className="whitespace-pre-wrap">{unit.unit_notes}</p>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </CardContent>
@@ -427,9 +449,8 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
               jobId={id}
               currentStatus={job.status}
               billingStatus={job.billing_status}
-              returnTripNeeded={job.return_trip_needed}
-              totalReports={units.reduce((sum, u) => sum + u.expected_reports, 0)}
-              uploadedReports={units.reduce((sum, u) => sum + u.reports_uploaded, 0)}
+              totalReports={totalUnits}
+              uploadedReports={completedUnitsCount}
             />
           )}
 

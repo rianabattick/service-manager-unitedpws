@@ -16,9 +16,9 @@ interface SearchParams {
   toDate?: string
   customer?: string
   technician?: string
-  vendor?: string // Added vendor filter parameter
-  view?: "active" | "completed" | "overdue" | "return-trip" // Updated view type to include return-trip
-  page?: string // Add page parameter
+  vendor?: string
+  view?: "active" | "completed" | "overdue" | "return-trip"
+  page?: string
 }
 
 export default async function ManagerJobsPage({
@@ -57,25 +57,22 @@ export default async function ManagerJobsPage({
     status: params.status,
     customerId: params.customer,
     technicianId: params.technician,
-    vendorId: params.vendor, // Pass vendor filter to query
+    vendorId: params.vendor,
     fromDate: params.fromDate,
     toDate: params.toDate,
   })
 
   let filteredJobs = jobs
 
-  // If a specific status filter is selected, filter by that status
+  // Filter Logic
   if (params.status) {
     filteredJobs = jobs.filter((job) => job.status === params.status)
   } else {
-    // Otherwise, filter by view mode (active, completed, overdue, or return-trip)
     const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)
 
     if (viewMode === "return-trip") {
-      // Show jobs where manager_return_trip_needed = true
       filteredJobs = jobs.filter((job) => job.manager_return_trip_needed === true)
     } else if (viewMode === "overdue") {
-      // Show jobs with overdue status OR jobs that are 2+ days past scheduled date
       filteredJobs = jobs.filter(
         (job) =>
           job.status === "overdue" ||
@@ -86,7 +83,6 @@ export default async function ManagerJobsPage({
     } else if (viewMode === "completed") {
       filteredJobs = jobs.filter((job) => job.status === "completed")
     } else {
-      // Active jobs: not completed, cancelled, or overdue
       filteredJobs = jobs.filter((job) => !["completed", "cancelled", "overdue"].includes(job.status))
     }
   }
@@ -95,6 +91,21 @@ export default async function ManagerJobsPage({
   const totalPages = Math.ceil(totalItems / itemsPerPage)
   const paginatedJobs = filteredJobs.slice(offset, offset + itemsPerPage)
 
+  // Fetch Attachments for Report Progress Logic
+  const jobIds = paginatedJobs.map((j) => j.id)
+  
+  let attachments: any[] = []
+  if (jobIds.length > 0) {
+    const { data } = await supabase
+      .from("job_attachments")
+      .select("job_id, equipment_id")
+      .in("job_id", jobIds)
+      .in("type", ["photo", "document"])
+    
+    if (data) attachments = data
+  }
+
+  // Fetch Filter Data
   const { data: customers } = await supabase
     .from("customers")
     .select("id, first_name, last_name, company_name")
@@ -136,7 +147,6 @@ export default async function ManagerJobsPage({
       <Card>
         <CardContent className="pt-6">
           <form method="get" className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {/* Status Filter */}
             <div>
               <label htmlFor="status" className="block text-sm font-medium mb-2">
                 Status
@@ -158,7 +168,6 @@ export default async function ManagerJobsPage({
               </select>
             </div>
 
-            {/* Customer Filter */}
             <div>
               <label htmlFor="customer" className="block text-sm font-medium mb-2">
                 Customer
@@ -178,7 +187,6 @@ export default async function ManagerJobsPage({
               </select>
             </div>
 
-            {/* Field Engineer Filter */}
             <div>
               <label htmlFor="technician" className="block text-sm font-medium mb-2">
                 Field Engineer
@@ -217,7 +225,6 @@ export default async function ManagerJobsPage({
               </select>
             </div>
 
-            {/* Date Range */}
             <div className="md:col-span-2">
               <label className="block text-sm font-medium mb-2">Date Range</label>
               <div className="flex gap-2">
@@ -244,7 +251,6 @@ export default async function ManagerJobsPage({
               </div>
             </div>
 
-            {/* Submit Button */}
             <div className="flex items-end">
               <button
                 type="submit"
@@ -254,7 +260,6 @@ export default async function ManagerJobsPage({
               </button>
             </div>
 
-            {/* Clear Filters */}
             <div className="flex items-end">
               <Link
                 href="/manager/jobs"
@@ -314,37 +319,59 @@ export default async function ManagerJobsPage({
                       <th className="pb-3 font-semibold">Status</th>
                       <th className="pb-3 font-semibold">Scheduled Date</th>
                       <th className="pb-3 font-semibold">Field Engineers</th>
-                      <th className="pb-3 font-semibold">Units</th>
+                      {/* Removed Units Column */}
+                      <th className="pb-3 font-semibold">Reports</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {paginatedJobs.map((job) => (
-                      <tr key={job.id} className="hover:bg-muted/50">
-                        <td className="py-3">
-                          <Link href={`/manager/jobs/${job.id}`} className="text-primary hover:underline font-medium">
-                            {job.title || "Untitled Job"}
-                          </Link>
-                        </td>
-                        <td className="py-3">{job.customer_name}</td>
-                        <td className="py-3 text-muted-foreground">{job.site_name || "—"}</td>
-                        <td className="py-3">
-                          <span
-                            className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(job.status)}`}
-                          >
-                            {job.status}
-                          </span>
-                        </td>
-                        <td className="py-3 text-muted-foreground">
-                          {job.scheduled_date ? new Date(job.scheduled_date).toLocaleDateString() : "Not scheduled"}
-                        </td>
-                        <td className="py-3">
-                          {job.technicians.length > 0 ? job.technicians.map((t) => t.full_name).join(", ") : "—"}
-                        </td>
-                        <td className="py-3 text-muted-foreground">
-                          {job.unit_count > 0 ? `${job.unit_count} units` : "—"}
-                        </td>
-                      </tr>
-                    ))}
+                    {paginatedJobs.map((job) => {
+                      // Calculate Report Progress Logic
+                      const totalUnits = job.unit_count || 0;
+                      
+                      const jobAttachments = attachments.filter(a => a.job_id === job.id);
+                      // Approximate unique units completed by counting unique equipment_ids in attachments
+                      const uniqueReportedUnits = new Set(jobAttachments.map(a => a.equipment_id)).size;
+                      const unitsCompleted = Math.min(uniqueReportedUnits, totalUnits);
+
+                      const isComplete = totalUnits === 0 || unitsCompleted >= totalUnits;
+
+                      return (
+                        <tr key={job.id} className="hover:bg-muted/50">
+                          <td className="py-3">
+                            <Link href={`/manager/jobs/${job.id}`} className="text-primary hover:underline font-medium">
+                              {job.title || "Untitled Job"}
+                            </Link>
+                          </td>
+                          <td className="py-3">{job.customer_name}</td>
+                          <td className="py-3 text-muted-foreground">{job.site_name || "—"}</td>
+                          <td className="py-3">
+                            <span
+                              className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(job.status)}`}
+                            >
+                              {job.status}
+                            </span>
+                          </td>
+                          <td className="py-3 text-muted-foreground">
+                            {job.scheduled_date ? new Date(job.scheduled_date).toLocaleDateString() : "Not scheduled"}
+                          </td>
+                          <td className="py-3">
+                            {job.technicians.length > 0 ? job.technicians.map((t) => t.full_name).join(", ") : "—"}
+                          </td>
+                          {/* Removed Units Data Cell */}
+                          <td className="py-3">
+                            <span
+                              className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                                isComplete
+                                  ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
+                                  : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                              }`}
+                            >
+                              {unitsCompleted} / {totalUnits}
+                            </span>
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
