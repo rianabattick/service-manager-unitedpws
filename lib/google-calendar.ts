@@ -122,8 +122,9 @@ function buildEventDescription(job: any, equipmentList: any[], contacts: any[]) 
     })
   }
 
-  if (job.internal_notes) {
-    d += `NOTES\n${separator}\n\n${job.internal_notes}\n`
+  const jobNotes = job.notes || job.internal_notes;
+  if (jobNotes) {
+    d += `NOTES\n${separator}\n\n${jobNotes}\n`
   }
 
   d += `\nScheduled by: schedule@unitedpws.com`
