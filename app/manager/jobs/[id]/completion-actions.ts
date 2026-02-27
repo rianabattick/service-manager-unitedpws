@@ -72,6 +72,7 @@ export async function updateChecklist(
     invoiced: boolean
     no_pending_return_visits: boolean
     parts_logistics_completed: boolean
+    reviewed_by_senior_tech: boolean
   },
   currentJobStatus: string,
 ) {

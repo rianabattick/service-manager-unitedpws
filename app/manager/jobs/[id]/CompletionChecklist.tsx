@@ -25,8 +25,9 @@ export function CompletionChecklist({
     reports_sent_to_customer: false,
     reports_saved_in_file: false,
     invoiced: false,
-    // Removed: no_pending_return_visits
     parts_logistics_completed: false,
+    // 👇 ADDED: New field state
+    reviewed_by_senior_tech: false,
   })
   const [isLoading, setIsLoading] = useState(true)
   const [completionInfo, setCompletionInfo] = useState<{
@@ -43,8 +44,9 @@ export function CompletionChecklist({
           reports_sent_to_customer: result.data.reports_sent_to_customer,
           reports_saved_in_file: result.data.reports_saved_in_file,
           invoiced: result.data.invoiced,
-          // Removed: no_pending_return_visits from data load
           parts_logistics_completed: result.data.parts_logistics_completed,
+          // 👇 ADDED: Load new field
+          reviewed_by_senior_tech: result.data.reviewed_by_senior_tech,
         })
         if (result.data.completed_by && result.data.completed_at) {
           setCompletionInfo({
@@ -75,7 +77,6 @@ export function CompletionChecklist({
             invoiced: invoicedAutoChecked,
           }
           // Persist the auto-checked values
-          // 👇 FIXED: Added 'as any' to suppress the red squiggly line
           updateChecklist(jobId, updated as any, currentStatus)
           return updated
         }
@@ -91,7 +92,6 @@ export function CompletionChecklist({
     const updatedChecklist = { ...checklist, [key]: checked }
     setChecklist(updatedChecklist)
 
-    // 👇 FIXED: Added 'as any' to suppress the red squiggly line
     await updateChecklist(jobId, updatedChecklist as any, currentStatus)
   }
 
@@ -125,6 +125,21 @@ export function CompletionChecklist({
             />
             <label htmlFor="reports_uploaded" className="text-sm cursor-pointer leading-none peer-disabled:opacity-70">
               Reports uploaded {totalReports === 0 && <span className="text-muted-foreground ml-1">(N/A)</span>}
+            </label>
+          </div>
+
+          {/* 👇 ADDED: New Checkbox block */}
+          <div className="flex items-start gap-3">
+            <Checkbox
+              id="reviewed_by_senior_tech"
+              checked={checklist.reviewed_by_senior_tech}
+              onCheckedChange={(checked) => handleCheckChange("reviewed_by_senior_tech", checked as boolean)}
+            />
+            <label
+              htmlFor="reviewed_by_senior_tech"
+              className="text-sm cursor-pointer leading-none peer-disabled:opacity-70"
+            >
+              Reviewed by Senior Tech (if N/A check box)
             </label>
           </div>
 
