@@ -3,9 +3,12 @@ import { getCurrentUser } from "@/lib/db"
 import { createClient } from "@/lib/supabase-server"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
-// 👇 Added Clock icon
-import { ArrowLeft, FileText, Download, CheckCircle2, Clock } from "lucide-react" 
+import { ArrowLeft, FileText, CheckCircle2, Clock } from "lucide-react" 
 import { Button } from "@/components/ui/button"
+
+// 👇 ADDED: Import the upload form and report actions (adjust the path as needed to point to where these files are saved!)
+import { ReportUploadForm } from "@/app/technician/jobs/[id]/reports/ReportUploadForm"
+import { ReportActions } from "@/app/technician/jobs/[id]/reports/ReportActions"
 
 export default async function ManagerReportsPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser()
@@ -139,7 +142,7 @@ export default async function ManagerReportsPage({ params }: { params: Promise<{
                       )}
                     </div>
                     
-                    {/* Status Indicator (Green Check or Orange Clock) */}
+                    {/* Status Indicator */}
                     <div className="flex items-center gap-2">
                        {hasReport ? (
                          <>
@@ -148,7 +151,6 @@ export default async function ManagerReportsPage({ params }: { params: Promise<{
                          </>
                        ) : (
                          <>
-                           {/* 👇 CHANGED: Orange Clock + "Pending" */}
                            <Clock className="w-5 h-5 text-orange-600 dark:text-orange-500" />
                            <span className="text-sm font-medium text-orange-600 dark:text-orange-500 hidden sm:inline-block">Pending</span>
                          </>
@@ -156,44 +158,43 @@ export default async function ManagerReportsPage({ params }: { params: Promise<{
                     </div>
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  {unit.reports.length === 0 ? (
-                    <p className="text-sm text-muted-foreground italic">No reports uploaded yet for this unit.</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {unit.reports.map((report: any) => (
-                        <div 
-                          key={report.id} 
-                          className="flex flex-col sm:flex-row sm:items-center justify-between p-3 border rounded-lg gap-3"
-                        >
-                          <div className="flex items-center gap-3 overflow-hidden">
-                            <div className="p-2 bg-primary/10 rounded-md shrink-0">
-                              <FileText className="w-5 h-5 text-primary" />
-                            </div>
-                            
-                            <div className="min-w-0">
-                              <p className="text-sm font-medium truncate">{report.file_name}</p>
-                              <p className="text-xs text-muted-foreground">
-                                Uploaded by {report.uploader?.full_name || "Unknown"} on{" "}
-                                {new Date(report.created_at).toLocaleString()}
-                              </p>
-                            </div>
-                          </div>
+                <CardContent className="space-y-4">
+                  {/* 👇 ADDED: Upload Form exactly as it is on the tech side */}
+                  <ReportUploadForm jobId={jobId} equipmentId={unit.equipment_id} />
 
-                          <div className="flex items-center gap-2 shrink-0">
-                            <a 
-                              href={`${report.file_url}?download=${encodeURIComponent(report.file_name)}`} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                            >
-                              <Button variant="outline" size="sm">
-                                <Download className="w-4 h-4 mr-1" />
-                                Download
-                              </Button>
-                            </a>
+                  {/* Existing Reports */}
+                  {unit.reports.length === 0 ? (
+                    <p className="text-sm text-muted-foreground italic mt-2">No reports uploaded yet for this unit.</p>
+                  ) : (
+                    <div className="space-y-2 mt-2">
+                      <h4 className="text-sm font-medium">Uploaded Reports</h4>
+                      <div className="space-y-2">
+                        {unit.reports.map((report: any) => (
+                          <div 
+                            key={report.id} 
+                            className="flex flex-col sm:flex-row sm:items-center justify-between p-3 border rounded-lg gap-3"
+                          >
+                            <div className="flex items-center gap-3 overflow-hidden">
+                              <div className="p-2 bg-primary/10 rounded-md shrink-0">
+                                <FileText className="w-5 h-5 text-primary" />
+                              </div>
+                              
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium truncate">{report.file_name}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  Uploaded by {report.uploader?.full_name || "Unknown"} on{" "}
+                                  {new Date(report.created_at).toLocaleString()}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* 👇 CHANGED: Replaced static Download button with ReportActions so they get the Delete option */}
+                            <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                              <ReportActions reportId={report.id} jobId={jobId} fileName={report.file_name} />
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
                   )}
                 </CardContent>
