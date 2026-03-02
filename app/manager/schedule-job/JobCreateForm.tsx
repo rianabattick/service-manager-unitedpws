@@ -913,6 +913,12 @@ export function JobCreateForm({
     }
   }
 
+  const sortedCustomers = [...customers].sort((a, b) => {
+    const nameA = (a.company_name || `${a.first_name || ""} ${a.last_name || ""}`).trim().toLowerCase();
+    const nameB = (b.company_name || `${b.first_name || ""} ${b.last_name || ""}`).trim().toLowerCase();
+    return nameA.localeCompare(nameB);
+  });
+
   return (
     <div>
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -961,7 +967,7 @@ export function JobCreateForm({
                 required
               >
                 <option value="">Select a company...</option>
-                {customers.map((c) => (
+                {sortedCustomers.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.company_name || `${c.first_name || ""} ${c.last_name || ""}`.trim() || "Unknown"}
                   </option>
