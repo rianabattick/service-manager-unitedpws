@@ -127,6 +127,14 @@ export default async function ContractDetailPage({
                     <p className="text-sm capitalize font-medium">{contract.billing_type.replace(/_/g, " ")}</p>
                   </div>
                 )}
+                {/* 👇 ADDED THIS BLOCK */}
+                {contract.invoice_po_number && (
+                  <div>
+                    <span className="text-sm text-muted-foreground">Invoice / PO #</span>
+                    <p className="text-sm font-medium">{contract.invoice_po_number}</p>
+                  </div>
+                )}
+                {/* ☝️ END ADDED BLOCK */}
                 {contract.pm_due_next && (
                   <div>
                     <span className="text-sm text-muted-foreground">PM Due Next</span>

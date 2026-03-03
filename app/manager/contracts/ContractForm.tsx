@@ -82,6 +82,7 @@ export function ContractForm({
   const [agreementLengthYears, setAgreementLengthYears] = useState(contract?.agreement_length_years || 1)
   const [startDate, setStartDate] = useState(contract?.start_date || "")
   const [endDate, setEndDate] = useState(contract?.end_date || "")
+  const [invoicePoNumber, setInvoicePoNumber] = useState(contract?.invoice_po_number || "")
   
   // 👇 FIXED: Initialize with contract data (snake_case from DB)
   const [pmDueNext, setPmDueNext] = useState(contract?.pm_due_next || "")
@@ -192,6 +193,7 @@ export function ContractForm({
           unitInformation: unitInformation || undefined,
           status,
           billingType,
+          invoicePoNumber: invoicePoNumber || null, // 👇 ADDED THIS
         })
         console.log("[v0] Contract updated, redirecting to:", `/manager/contracts/${contract.id}`)
         window.location.href = `/manager/contracts/${contract.id}`
@@ -213,6 +215,7 @@ export function ContractForm({
           unitInformation: unitInformation || undefined,
           status,
           billingType,
+          invoicePoNumber: invoicePoNumber || null, // 👇 ADDED THIS
         })
         console.log("[v0] Contract created successfully:", newContract.id)
         console.log("[v0] Redirecting to:", `/manager/contracts/${newContract.id}`)
@@ -443,6 +446,18 @@ export function ContractForm({
               placeholder="Add unit/equipment information..."
             />
           </div>
+
+          {/* 👇 ADDED THIS BLOCK */}
+          <div className="space-y-2">
+            <Label htmlFor="invoicePoNumber">Invoice / PO #</Label>
+            <Input
+              id="invoicePoNumber"
+              value={invoicePoNumber}
+              onChange={(e) => setInvoicePoNumber(e.target.value)}
+              placeholder="e.g. PO-12345 or INV-987"
+            />
+          </div>
+          {/* ☝️ END ADDED BLOCK */}
 
           <div className="space-y-2">
             <Label htmlFor="billingType">

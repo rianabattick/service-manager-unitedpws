@@ -28,6 +28,7 @@ export interface Contract {
   service_count?: number
   pm_due_next?: string
   unit_information?: string
+  invoice_po_number?: string // 👇 ADDED THIS
   created_at: string
   updated_at?: string
 }
@@ -236,6 +237,7 @@ export async function createContract(params: {
   unitInformation?: string
   status?: string // Added status parameter
   billingType?: string
+  invoicePoNumber?: string | null // 👇 CHANGED: Added | null
 }) {
   const supabase = await createAdminClient()
 
@@ -272,6 +274,7 @@ export async function createContract(params: {
       pm_due_next: params.pmDueNext || null,
       unit_information: params.unitInformation || null,
       billing_type: params.billingType || "due_on_receipt",
+      invoice_po_number: params.invoicePoNumber || null, // 👇 ADDED THIS
     })
     .select()
     .single()
@@ -342,6 +345,7 @@ export async function updateContract(
     pmDueNext?: string
     unitInformation?: string
     billingType?: string
+    invoicePoNumber?: string | null // 👇 CHANGED: Added | null
   },
 ) {
   const supabase = await createAdminClient()
@@ -374,6 +378,7 @@ export async function updateContract(
   if (params.pmDueNext !== undefined) updateData.pm_due_next = params.pmDueNext
   if (params.unitInformation !== undefined) updateData.unit_information = params.unitInformation
   if (params.billingType !== undefined) updateData.billing_type = params.billingType
+  if (params.invoicePoNumber !== undefined) updateData.invoice_po_number = params.invoicePoNumber // 👇 ADDED THIS
 
   updateData.updated_at = new Date().toISOString()
 
