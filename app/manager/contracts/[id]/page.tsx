@@ -127,14 +127,20 @@ export default async function ContractDetailPage({
                     <p className="text-sm capitalize font-medium">{contract.billing_type.replace(/_/g, " ")}</p>
                   </div>
                 )}
-                {/* 👇 ADDED THIS BLOCK */}
-                {contract.invoice_po_number && (
+                {/* 👇 NEW ARRAY DISPLAY */}
+                {contract.invoice_po_numbers && contract.invoice_po_numbers.length > 0 && (
                   <div>
-                    <span className="text-sm text-muted-foreground">Invoice / PO #</span>
-                    <p className="text-sm font-medium">{contract.invoice_po_number}</p>
+                    <span className="text-sm text-muted-foreground">Invoice / PO #(s)</span>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {contract.invoice_po_numbers.map((inv: string, i: number) => (
+                        <span key={i} className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-secondary text-secondary-foreground">
+                          {inv}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 )}
-                {/* ☝️ END ADDED BLOCK */}
+                {/* ☝️ END ARRAY DISPLAY */}
                 {contract.pm_due_next && (
                   <div>
                     <span className="text-sm text-muted-foreground">PM Due Next</span>

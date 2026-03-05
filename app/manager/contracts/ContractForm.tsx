@@ -19,6 +19,7 @@ interface ContractFormProps {
     services?: any[]; 
     unit_information?: string; 
     pm_due_next?: string; 
+    invoice_po_numbers?: string[]; // 👇 Added for TS
   }
   customers: Array<{ id: string; name: string; company_name?: string; first_name?: string; last_name?: string }>
   organizationId: string
@@ -82,7 +83,11 @@ export function ContractForm({
   const [agreementLengthYears, setAgreementLengthYears] = useState(contract?.agreement_length_years || 1)
   const [startDate, setStartDate] = useState(contract?.start_date || "")
   const [endDate, setEndDate] = useState(contract?.end_date || "")
-  const [invoicePoNumber, setInvoicePoNumber] = useState(contract?.invoice_po_number || "")
+  
+  // 👇 NEW: Dynamic array state for Invoices
+  const [invoicePoNumbers, setInvoicePoNumbers] = useState<string[]>(
+    contract?.invoice_po_numbers?.length ? contract.invoice_po_numbers : [""]
+  )
   
   // 👇 FIXED: Initialize with contract data (snake_case from DB)
   const [pmDueNext, setPmDueNext] = useState(contract?.pm_due_next || "")
@@ -96,6 +101,21 @@ export function ContractForm({
   )
 
   const totalPMsPerYear = services.reduce((sum, service) => sum + service.frequencyMonths, 0)
+
+  // Handlers for dynamic Invoice list
+  const handleUpdateInvoice = (index: number, value: string) => {
+    const updated = [...invoicePoNumbers]
+    updated[index] = value
+    setInvoicePoNumbers(updated)
+  }
+
+  const handleAddInvoice = () => {
+    setInvoicePoNumbers([...invoicePoNumbers, ""])
+  }
+
+  const handleRemoveInvoice = (index: number) => {
+    setInvoicePoNumbers(invoicePoNumbers.filter((_, i) => i !== index))
+  }
 
   const addService = () => {
     setServices([...services, { serviceType: "MJPM", frequencyMonths: 1 }])
@@ -177,6 +197,10 @@ export function ContractForm({
 
     console.log("[v0] Form submitted")
 
+    // Clean out empty text boxes before saving
+    const cleanedInvoices = invoicePoNumbers.filter(inv => inv.trim() !== "")
+    const finalInvoices = cleanedInvoices.length > 0 ? cleanedInvoices : null
+
     try {
       if (contract) {
         console.log("[v0] Updating contract:", contract.id)
@@ -193,7 +217,7 @@ export function ContractForm({
           unitInformation: unitInformation || undefined,
           status,
           billingType,
-          invoicePoNumber: invoicePoNumber || null, // 👇 ADDED THIS
+          invoicePoNumbers: finalInvoices, // 👇 Updated mapping
         })
         console.log("[v0] Contract updated, redirecting to:", `/manager/contracts/${contract.id}`)
         window.location.href = `/manager/contracts/${contract.id}`
@@ -215,7 +239,7 @@ export function ContractForm({
           unitInformation: unitInformation || undefined,
           status,
           billingType,
-          invoicePoNumber: invoicePoNumber || null, // 👇 ADDED THIS
+          invoicePoNumbers: finalInvoices, // 👇 Updated mapping
         })
         console.log("[v0] Contract created successfully:", newContract.id)
         console.log("[v0] Redirecting to:", `/manager/contracts/${newContract.id}`)
@@ -447,17 +471,30 @@ export function ContractForm({
             />
           </div>
 
-          {/* 👇 ADDED THIS BLOCK */}
-          <div className="space-y-2">
-            <Label htmlFor="invoicePoNumber">Invoice / PO #</Label>
-            <Input
-              id="invoicePoNumber"
-              value={invoicePoNumber}
-              onChange={(e) => setInvoicePoNumber(e.target.value)}
-              placeholder="e.g. PO-12345 or INV-987"
-            />
+          {/* 👇 NEW DYNAMIC INVOICE BLOCK */}
+          <div className="space-y-3 pt-2">
+            <div className="flex items-center justify-between">
+              <Label>Invoice / PO #(s)</Label>
+              <Button type="button" variant="outline" size="sm" onClick={handleAddInvoice}>
+                <Plus className="w-4 h-4 mr-1" /> Add
+              </Button>
+            </div>
+            {invoicePoNumbers.map((inv, index) => (
+              <div key={index} className="flex gap-2">
+                <Input
+                  value={inv}
+                  onChange={(e) => handleUpdateInvoice(index, e.target.value)}
+                  placeholder="e.g. PO-12345 or INV-987"
+                />
+                {invoicePoNumbers.length > 1 && (
+                  <Button type="button" variant="ghost" size="icon" onClick={() => handleRemoveInvoice(index)}>
+                    <X className="w-4 h-4 text-muted-foreground" />
+                  </Button>
+                )}
+              </div>
+            ))}
           </div>
-          {/* ☝️ END ADDED BLOCK */}
+          {/* ☝️ END DYNAMIC INVOICE BLOCK */}
 
           <div className="space-y-2">
             <Label htmlFor="billingType">
@@ -498,6 +535,7 @@ export function ContractForm({
           </div>
         </form>
 
+        {/* ... (Keep Add Company modal as is) ... */}
         {showAddCompany && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div className="bg-background border rounded-lg p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
