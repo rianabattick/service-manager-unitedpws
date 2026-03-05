@@ -11,20 +11,29 @@ export default function ManagerLayout({
     <div className="flex min-h-screen">
       {/* Sidebar */}
       <aside className="w-64 bg-slate-950 text-slate-100 p-4 flex flex-col">
-        <div className="mb-6 bg-white p-4 rounded-lg">
+        <div className="mb-6 bg-white p-4 rounded-lg flex flex-col items-center">
           <Image
-            src="/images/united-power-logo.png"
-            alt="United Power System"
-            width={200}
-            height={40}
-            className="mb-4"
+            src="/images/powerlink-logo.svg"
+            alt="Power Link"
+            width={240}
+            height={72}
+            className="mb-4 w-48 h-auto"
             priority
           />
-          <h1 className="text-xs uppercase tracking-wide text-slate-400 font-semibold">Service Manager</h1>
+          <h1 className="text-xs uppercase tracking-wide text-slate-400 font-semibold w-full text-center border-t border-slate-100 pt-2">Service Manager</h1>
         </div>
 
         {/* Navigation */}
         <ManagerNav />
+
+        {/* 👇 NEW: Bottom Sidebar Footer */}
+        <div className="mt-auto pt-6 pb-2 text-center border-t border-slate-800/50">
+          <p className="text-[9px] uppercase tracking-widest text-slate-500">
+            Powered by<br/>
+            <span className="text-slate-400 font-semibold mt-1 inline-block">United Power System</span>
+          </p>
+        </div>
+        {/* ☝️ End Footer */}
       </aside>
 
       {/* Main Content Area */}

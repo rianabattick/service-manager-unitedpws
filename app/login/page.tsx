@@ -85,16 +85,16 @@ export default function LoginPage() {
         <CardHeader className="space-y-1">
           <div className="flex justify-center mb-6">
             <Image
-              src="/images/united-power-logo.png"
-              alt="United Power System"
-              width={400}
-              height={80}
+              src="/images/powerlink-logo.svg"
+              alt="Power Link"
+              width={300}
+              height={90}
               priority
-              className="w-auto h-16"
+              className="w-72 h-auto"
             />
           </div>
           <CardTitle className="text-2xl font-bold">Sign in</CardTitle>
-          <CardDescription>Enter your email and password to access Service Manager</CardDescription>
+          <CardDescription>Enter your email and password to access Power Link</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
@@ -135,9 +135,19 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          <div className="mt-4 text-center text-sm text-muted-foreground">
-            <p>Login credentials will be provided by your administrator</p>
+          {/* 👇 Updated Footer Section with Company Affiliation */}
+          <div className="mt-6 flex flex-col items-center text-center">
+            <p className="text-sm text-muted-foreground mb-4">
+              Login credentials will be provided by your administrator
+            </p>
+            <div className="w-full border-t border-border pt-4">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Powered by <span className="text-foreground font-bold">United Power System</span>
+              </p>
+            </div>
           </div>
+          {/* ☝️ End Updated Footer Section */}
+
         </CardContent>
       </Card>
     </div>
