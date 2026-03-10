@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { DeleteJobButton } from "./DeleteJobButton"
 import { CompletionChecklist } from "./CompletionChecklist"
 import { ReturnTripManager } from "./ReturnTripManager"
+import { ReadyToBillButton } from "@/components/ReadyToBillButton"
 
 // Helper to format generic strings like "time_and_materials" -> "Time & Materials"
 function formatString(str: string | null) {
@@ -453,6 +454,17 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
               uploadedReports={completedUnitsCount}
             />
           )}
+
+          {/* 👇 NEW READY TO BILL BUTTON HERE */}
+          {isManager && (
+            <ReadyToBillButton 
+              jobId={id}
+              jobTitle={job.title || "Untitled Job"}
+              jobNumber={job.job_number || job.id}
+              currentBillingStatus={job.billing_status}
+            />
+          )}
+          {/* ☝️ END NEW BUTTON */}
 
           {isManager && (
             <ReturnTripManager
