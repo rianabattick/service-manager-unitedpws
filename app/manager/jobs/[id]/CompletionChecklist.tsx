@@ -62,28 +62,30 @@ export function CompletionChecklist({
 
   // Auto-check based on props
   useEffect(() => {
-    if (!isLoading) {
-      // 0/0 Logic: Auto-check if 0 reports expected
-      const reportsAutoChecked = totalReports === 0 || uploadedReports >= totalReports
-      
-      const invoicedAutoChecked =
-        billingStatus === "invoiced" || billingStatus === "paid" || billingStatus === "un_billable"
+    if (isLoading) return
 
-      setChecklist((prev) => {
-        if (prev.reports_uploaded !== reportsAutoChecked || prev.invoiced !== invoicedAutoChecked) {
-          const updated = {
-            ...prev,
-            reports_uploaded: reportsAutoChecked,
-            invoiced: invoicedAutoChecked,
-          }
-          // Persist the auto-checked values
-          updateChecklist(jobId, updated as any, currentStatus)
-          return updated
-        }
-        return prev
-      })
+    const reportsAutoChecked = totalReports === 0 || uploadedReports >= totalReports
+    const invoicedAutoChecked =
+      billingStatus === "invoiced" || billingStatus === "paid" || billingStatus === "un_billable"
+
+    // Check if we ACTUALLY need an update before doing anything
+    if (
+      checklist.reports_uploaded !== reportsAutoChecked ||
+      checklist.invoiced !== invoicedAutoChecked
+    ) {
+      const updatedChecklist = {
+        ...checklist,
+        reports_uploaded: reportsAutoChecked,
+        invoiced: invoicedAutoChecked,
+      }
+      
+      // 1. Update the local state first
+      setChecklist(updatedChecklist)
+      
+      // 2. Safely call the server update outside the state setter
+      updateChecklist(jobId, updatedChecklist as any, currentStatus)
     }
-  }, [totalReports, uploadedReports, billingStatus, isLoading, jobId, currentStatus])
+  }, [totalReports, uploadedReports, billingStatus, isLoading, checklist, jobId, currentStatus])
 
   // This will now return TRUE even if the return trip field (which is gone) was false
   const allCompleted = Object.values(checklist).every((v) => v)

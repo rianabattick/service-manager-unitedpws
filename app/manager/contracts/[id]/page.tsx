@@ -6,6 +6,7 @@ import { ArrowLeft } from "lucide-react"
 import { getCurrentUser } from "@/lib/db"
 import { getContractDetail } from "@/lib/contracts"
 import { DeleteContractButton } from "./DeleteContractButton"
+import { ServiceCounterEditor } from "@/components/ServiceCounterEditor"
 
 export default async function ContractDetailPage({
   params,
@@ -182,20 +183,14 @@ export default async function ContractDetailPage({
             <CardContent>
               {contract.services && contract.services.length > 0 ? (
                 <div className="space-y-4">
-                  <div className="flex items-center gap-4 p-4 bg-muted rounded-lg">
-                    <div className="text-2xl font-bold text-muted-foreground">
-                      {completedServices}/{totalServices}
-                    </div>
-                    <div>
-                      <p className="font-semibold">
-                        {totalPMsPerYear} PM{totalPMsPerYear !== 1 ? "s" : ""} per year
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        Total: {totalServices} services over {contract.agreement_length_years || 1} year
-                        {(contract.agreement_length_years || 1) !== 1 ? "s" : ""}
-                      </p>
-                    </div>
-                  </div>
+                  <ServiceCounterEditor 
+                    contractId={id}
+                    automaticCount={completedServices}
+                    manualCount={contract.manual_completed_services || 0}
+                    totalServices={totalServices}
+                    totalPMsPerYear={totalPMsPerYear}
+                    agreementLength={contract.agreement_length_years || 1}
+                  />
 
                   <div className="space-y-3">
                     {contract.services.map((service: any) => (
