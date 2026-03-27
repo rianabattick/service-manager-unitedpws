@@ -2,6 +2,8 @@
 
 import { createClient } from "@/lib/supabase-server"
 import { createNotifications, getManagerUserIds } from "@/lib/notifications"
+import { revalidatePath } from "next/cache"
+import { createAdminClient } from "@/lib/supabase-server"
 
 export async function createJobNotifications(
   jobId: string,
@@ -61,4 +63,22 @@ export async function createJobNotifications(
   }
 
   console.log("[v0] Finished creating notifications")
+}
+
+export async function setContractInProgress(contractId: string) {
+  const supabase = await createAdminClient()
+  
+  // 1. Force the database update using Admin privileges
+  const { error } = await supabase
+    .from("service_agreements")
+    .update({ status: "in_progress" })
+    .eq("id", contractId)
+
+  if (error) {
+    console.error("[v0] Server action error updating contract:", error)
+  }
+
+  // 2. Force Next.js to clear the cache so you instantly see the new status
+  revalidatePath(`/manager/contracts/${contractId}`)
+  revalidatePath(`/manager/contracts`)
 }

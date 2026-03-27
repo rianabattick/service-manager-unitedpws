@@ -10,13 +10,23 @@ export async function GET() {
   try {
     const supabase = await createAdminClient()
     const today = new Date()
+    const todayStr = today.toISOString().split("T")[0]
+
+    // Calculate 3 Months from now (for renewals)
     const threeMonthsFromNow = new Date(today)
     threeMonthsFromNow.setMonth(threeMonthsFromNow.getMonth() + 3)
+    const threeMonthsStr = threeMonthsFromNow.toISOString().split("T")[0]
 
+    // Calculate 1 Month from now (for PMs)
+    const oneMonthFromNow = new Date(today)
+    oneMonthFromNow.setMonth(oneMonthFromNow.getMonth() + 1)
+    const oneMonthStr = oneMonthFromNow.toISOString().split("T")[0]
+
+    // --- PART 1: OVERDUE CONTRACTS ---
     const { data: overdueContracts } = await supabase
       .from("service_agreements")
       .select("id, organization_id, agreement_number, name, end_date, status")
-      .lt("end_date", today.toISOString().split("T")[0])
+      .lt("end_date", todayStr)
       .neq("status", "overdue")
       .neq("status", "cancelled")
       .neq("status", "ended")
@@ -40,27 +50,25 @@ export async function GET() {
       }
     }
 
-    // Check for contracts ending within 3 months
+    // --- PART 2: RENEWAL NEEDED (3 Months out) ---
     const { data: expiringContracts } = await supabase
       .from("service_agreements")
       .select("id, organization_id, agreement_number, name, end_date, status")
-      .lte("end_date", threeMonthsFromNow.toISOString().split("T")[0])
-      .gte("end_date", today.toISOString().split("T")[0])
+      .lte("end_date", threeMonthsStr)
+      .gte("end_date", todayStr)
       .neq("status", "renewal_needed")
       .neq("status", "cancelled")
       .neq("status", "ended")
       .neq("status", "overdue")
 
-    // Update status to renewal_needed and send notifications
     if (expiringContracts && expiringContracts.length > 0) {
       for (const contract of expiringContracts) {
-        // Update status
         await supabase.from("service_agreements").update({ status: "renewal_needed" }).eq("id", contract.id)
 
-        // Send notification
         const managerIds = await getManagerUserIds(contract.organization_id, supabase)
         const contractLabel = contract.name || contract.agreement_number || contract.id
-        const endDate = new Date(contract.end_date).toLocaleDateString()
+        // Append time to prevent timezone shift issues in formatting
+        const endDate = new Date(contract.end_date + 'T12:00:00Z').toLocaleDateString()
 
         await createNotifications({
           organizationId: contract.organization_id,
@@ -74,69 +82,32 @@ export async function GET() {
       }
     }
 
-    // Check for contracts that need job creation based on service frequency
-    const { data: activeContracts } = await supabase
+    // --- PART 3: JOB CREATION NEEDED (1 Month before pm_due_next) ---
+    const { data: pmDueContracts } = await supabase
       .from("service_agreements")
-      .select(`
-        id,
-        organization_id,
-        agreement_number,
-        name,
-        start_date,
-        agreement_length_years,
-        status
-      `)
-      .in("status", ["active", "in_progress"])
+      .select("id, organization_id, agreement_number, name, pm_due_next, status")
+      .lte("pm_due_next", oneMonthStr) // The PM is due within 1 month (or is already past due)
+      .in("status", ["active", "in_progress"]) // Only touch contracts currently in progress
 
-    if (activeContracts && activeContracts.length > 0) {
-      for (const contract of activeContracts) {
-        // Get services for this contract
-        const { data: services } = await supabase
-          .from("contract_services")
-          .select("service_type, frequency_months")
-          .eq("contract_id", contract.id)
+    if (pmDueContracts && pmDueContracts.length > 0) {
+      for (const contract of pmDueContracts) {
+        if (!contract.pm_due_next) continue; // Safety check
 
-        if (!services || services.length === 0) continue
+        await supabase.from("service_agreements").update({ status: "job_creation_needed" }).eq("id", contract.id)
 
-        const totalPMsPerYear = services.reduce((sum: number, s: any) => sum + s.frequency_months, 0)
-        if (totalPMsPerYear === 0) continue
+        const managerIds = await getManagerUserIds(contract.organization_id, supabase)
+        const contractLabel = contract.name || contract.agreement_number || contract.id
+        const dueDate = new Date(contract.pm_due_next + 'T12:00:00Z').toLocaleDateString()
 
-        // Get jobs for this contract
-        const { data: jobs } = await supabase
-          .from("jobs")
-          .select("id, scheduled_start, status")
-          .eq("service_agreement_id", contract.id)
-          .order("scheduled_start", { ascending: false })
-
-        // Calculate when next job should be scheduled
-        const monthsBetweenJobs = 12 / totalPMsPerYear
-        const lastJobDate = jobs && jobs.length > 0 ? new Date(jobs[0].scheduled_start) : new Date(contract.start_date)
-        const nextJobDue = new Date(lastJobDate)
-        nextJobDue.setMonth(nextJobDue.getMonth() + monthsBetweenJobs)
-
-        // Send notification 1 month before next job is due
-        const oneMonthBeforeDue = new Date(nextJobDue)
-        oneMonthBeforeDue.setMonth(oneMonthBeforeDue.getMonth() - 1)
-
-        if (today >= oneMonthBeforeDue && today < nextJobDue && contract.status !== "job_creation_needed") {
-          // Update status
-          await supabase.from("service_agreements").update({ status: "job_creation_needed" }).eq("id", contract.id)
-
-          // Send notification
-          const managerIds = await getManagerUserIds(contract.organization_id, supabase)
-          const contractLabel = contract.name || contract.agreement_number || contract.id
-          const dueDate = nextJobDue.toLocaleDateString()
-
-          await createNotifications({
-            organizationId: contract.organization_id,
-            recipientUserIds: managerIds,
-            type: "contract_job_needed",
-            message: `Contract "${contractLabel}" - schedule next service by ${dueDate}`,
-            relatedEntityType: "contract",
-            relatedEntityId: contract.id,
-            supabase,
-          })
-        }
+        await createNotifications({
+          organizationId: contract.organization_id,
+          recipientUserIds: managerIds,
+          type: "contract_job_needed",
+          message: `Contract "${contractLabel}" - schedule next service by ${dueDate}`,
+          relatedEntityType: "contract",
+          relatedEntityId: contract.id,
+          supabase,
+        })
       }
     }
 
@@ -144,7 +115,7 @@ export async function GET() {
       success: true,
       overdueContracts: overdueContracts?.length || 0,
       expiringContracts: expiringContracts?.length || 0,
-      activeContracts: activeContracts?.length || 0,
+      pmDueContracts: pmDueContracts?.length || 0,
     })
   } catch (error) {
     console.error("[v0] Error checking contract statuses:", error)

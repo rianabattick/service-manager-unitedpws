@@ -11,12 +11,12 @@ import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { createClient } from "@/lib/supabase-client"
 import { X, Pencil, Trash2 } from "lucide-react" // Added Pencil and Trash2 imports
-import { createJobNotifications } from "./actions" // Import the createJobNotifications function
 // Added import for VendorSelect
 import VendorSelect from "@/components/shared/VendorSelect"
 import { createCalendarInviteForJob } from "@/lib/google-calendar"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { MultiSelectSite } from "@/components/shared/MultiSelectSite"
+import { createJobNotifications, setContractInProgress } from "./actions"
 
 interface JobCreateFormProps {
   organizationId: string
@@ -813,17 +813,9 @@ export function JobCreateForm({
       }
 
       if (jobType === "contracted" && contractId) {
-        const { error: contractUpdateError } = await supabase
-          .from("service_agreements")
-          .update({ status: "in_progress" })
-          .eq("id", contractId)
-          .in("status", ["job_creation_needed"])
-
-        if (contractUpdateError) {
-          console.error("[v0] Error updating contract status:", contractUpdateError)
-        } else {
-          console.log("[v0] Contract status updated to in_progress")
-        }
+        // Trigger the bulletproof server action instead of doing it on the client
+        await setContractInProgress(contractId)
+        console.log("[v0] Contract status updated to in_progress via server action")
       }
 
       await createJobNotifications(
