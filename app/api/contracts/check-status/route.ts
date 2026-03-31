@@ -1,6 +1,54 @@
 import { NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase-server"
 import { createNotifications, getManagerUserIds } from "@/lib/notifications"
+import nodemailer from "nodemailer"
+
+// --- THE SPEEDBUMP HELPER ---
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+
+// --- THE EMAIL HELPER ---
+async function sendContractEmail(contractLabel: string, statusText: string, contractId: string) {
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: process.env.SUPPORT_EMAIL_USER,
+      pass: process.env.SUPPORT_EMAIL_PASS,
+    },
+  })
+
+  // Safely get the app URL so the button works in both local testing and production
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+  const contractUrl = `${appUrl}/manager/contracts/${contractId}`
+
+  const mailOptions = {
+    from: process.env.SUPPORT_EMAIL_USER,
+    // 👇 ADD YOUR SECOND EMAIL ADDRESS HERE
+    to: [
+      process.env.SUPPORT_EMAIL_USER || "support@unitedpws.com", 
+      process.env.MANAGER_ALERT_EMAIL || "manager@unitedpws.com"
+    ], 
+    subject: `Contract Update: ${contractLabel} - ${statusText}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+        <h2 style="color: #0f172a;">Contract Status Updated</h2>
+        <p style="color: #334155; font-size: 16px;">
+          Hello,<br/><br/>
+          The contract <strong>${contractLabel}</strong> has automatically updated its status to <strong>${statusText}</strong>. It might be time to schedule a new job or reach out to your POC to renew the contract.
+        </p>
+        <div style="margin: 30px 0;">
+          <a href="${contractUrl}" style="background-color: #020617; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+            Please view Contract in Power Link
+          </a>
+        </div>
+        <p style="color: #64748b; font-size: 14px;">
+          Powered by United Power System
+        </p>
+      </div>
+    `,
+  }
+
+  await transporter.sendMail(mailOptions)
+}
 
 /**
  * Cron job to check contract statuses and send notifications
@@ -36,7 +84,8 @@ export async function GET() {
         await supabase.from("service_agreements").update({ status: "overdue" }).eq("id", contract.id)
 
         const managerIds = await getManagerUserIds(contract.organization_id, supabase)
-        const contractLabel = contract.name || contract.agreement_number || contract.id
+        // Ensure we don't use the ID as a fallback label
+        const contractLabel = contract.name || contract.agreement_number || 'Unnamed Contract'
 
         await createNotifications({
           organizationId: contract.organization_id,
@@ -47,6 +96,10 @@ export async function GET() {
           relatedEntityId: contract.id,
           supabase,
         })
+
+        // Send Email and wait 2 seconds
+        await sendContractEmail(contractLabel, "Overdue", contract.id)
+        await delay(2000)
       }
     }
 
@@ -66,7 +119,7 @@ export async function GET() {
         await supabase.from("service_agreements").update({ status: "renewal_needed" }).eq("id", contract.id)
 
         const managerIds = await getManagerUserIds(contract.organization_id, supabase)
-        const contractLabel = contract.name || contract.agreement_number || contract.id
+        const contractLabel = contract.name || contract.agreement_number || 'Unnamed Contract'
         // Append time to prevent timezone shift issues in formatting
         const endDate = new Date(contract.end_date + 'T12:00:00Z').toLocaleDateString()
 
@@ -79,6 +132,10 @@ export async function GET() {
           relatedEntityId: contract.id,
           supabase,
         })
+
+        // Send Email and wait 2 seconds
+        await sendContractEmail(contractLabel, "Renewal Needed", contract.id)
+        await delay(2000)
       }
     }
 
@@ -96,7 +153,7 @@ export async function GET() {
         await supabase.from("service_agreements").update({ status: "job_creation_needed" }).eq("id", contract.id)
 
         const managerIds = await getManagerUserIds(contract.organization_id, supabase)
-        const contractLabel = contract.name || contract.agreement_number || contract.id
+        const contractLabel = contract.name || contract.agreement_number || 'Unnamed Contract'
         const dueDate = new Date(contract.pm_due_next + 'T12:00:00Z').toLocaleDateString()
 
         await createNotifications({
@@ -108,6 +165,10 @@ export async function GET() {
           relatedEntityId: contract.id,
           supabase,
         })
+
+        // Send Email and wait 2 seconds
+        await sendContractEmail(contractLabel, "Job Creation Needed", contract.id)
+        await delay(2000)
       }
     }
 
