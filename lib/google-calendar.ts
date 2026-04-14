@@ -181,8 +181,6 @@ export async function createCalendarInviteForJob(jobId: string, technicianIds: s
           endDate = new Date(startDate.getTime() + 60 * 60 * 1000)
         }
 
-        // Fix 5: Use Job Title (Name) as the main summary header
-        // If title is missing, fallback to "Job: [Job Number]"
         const summaryTitle = job.title || `Job: ${job.job_number}`
 
         const eventPayload = {
@@ -231,30 +229,55 @@ export async function createCalendarInviteForJob(jobId: string, technicianIds: s
   }
 }
 
+// --- THIS IS THE ONLY PART THAT CHANGED ---
 export async function updateCalendarInviteForJob(jobId: string, newTechnicianIds: string[]): Promise<CalendarResult> {
-  // (Keeping this function concise as the logic is identical to create)
+  console.log("[v0] updateCalendarInviteForJob called", { jobId, newTechnicianIds })
   try {
     const supabase = await createClient()
-    const { data: existingTechs } = await supabase.from("job_technicians").select("*").eq("job_id", jobId)
-    const accessToken = await getAccessToken()
-    if (!accessToken) return { success: false, error: "Token failed" }
     
-    // ... (Removal logic is same as before) ...
-    // Note: I'm skipping the removal logic block for brevity, 
-    // but in your file you should keep the delete loop from the previous version.
+    // 1. Get the CURRENT techs assigned to this job before we change anything
+    const { data: existingTechs } = await supabase
+      .from("job_technicians")
+      .select("*")
+      .eq("job_id", jobId)
 
+    const accessToken = await getAccessToken()
+    if (!accessToken) return { success: false, error: "Failed to generate Google Access Token" }
+
+    const existingIds = (existingTechs || []).filter(t => t.google_event_id).map(t => t.technician_id)
+    
+    // Categorize our engineers
+    const techsToRemove = (existingTechs || []).filter(t => !newTechnicianIds.includes(t.technician_id))
+    const techsToUpdate = (existingTechs || []).filter(t => newTechnicianIds.includes(t.technician_id))
+    const techsToAdd = newTechnicianIds.filter(id => !existingIds.includes(id))
+
+    // 2. REMOVE from old engineers' calendars
+    for (const tech of techsToRemove) {
+      if (tech.google_event_id && tech.google_calendar_id) {
+        try {
+          console.log(`[v0] Deleting event from calendar: ${tech.google_calendar_id}`)
+          await fetch(
+            `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(tech.google_calendar_id)}/events/${tech.google_event_id}?sendUpdates=none`,
+            {
+              method: "DELETE",
+              headers: { Authorization: `Bearer ${accessToken}` },
+            }
+          )
+        } catch (e) {
+          console.error(`[v0] Failed to delete calendar event for ${tech.google_calendar_id}`, e)
+        }
+      }
+    }
+
+    // 3. UPDATE details for engineers still on the job
     const currentUser = await getCurrentUser()
-    if (currentUser?.organization_id) {
+    if (currentUser?.organization_id && techsToUpdate.length > 0) {
        const jobData = await getJobDetail(jobId, currentUser.organization_id)
        if (jobData?.job) {
           const job = jobData.job
           const description = buildEventDescription(job, jobData.units || [], jobData.contacts || [])
           
-          const existingTechIds = (existingTechs || []).map((t) => t.technician_id)
-          const techsToUpdate = existingTechIds.filter((id) => newTechnicianIds.includes(id))
-
-          for (const techId of techsToUpdate) {
-            const tech = existingTechs?.find((t) => t.technician_id === techId)
+          for (const tech of techsToUpdate) {
             if (tech?.google_event_id && tech?.google_calendar_id) {
                try {
                   const startDate = job.scheduled_start ? new Date(job.scheduled_start) : new Date()
@@ -282,11 +305,14 @@ export async function updateCalendarInviteForJob(jobId: string, newTechnicianIds
        }
     }
     
-    // Add new techs
-    const existingIds = (existingTechs || []).map(t => t.technician_id)
-    const techsToAdd = newTechnicianIds.filter(id => !existingIds.includes(id))
-    if (techsToAdd.length > 0) await createCalendarInviteForJob(jobId, techsToAdd)
+    // 4. ADD to new engineers' calendars
+    if (techsToAdd.length > 0) {
+      await createCalendarInviteForJob(jobId, techsToAdd)
+    }
 
     return { success: true }
-  } catch (error) { return { success: false, error: "Failed" } }
+  } catch (error) { 
+    console.error("[v0] updateCalendarInviteForJob error:", error)
+    return { success: false, error: "Failed to update calendar events" } 
+  }
 }

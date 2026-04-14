@@ -490,11 +490,9 @@ export default function JobEditForm({
         changes.push("equipment")
       }
 
-      // FIX: Construct proper ISO timestamp with UTC offset to prevent shifting
       const formDate = new Date(`${scheduledDate}T${scheduledTime}:00`);
       const isoScheduledStart = formDate.toISOString();
 
-      // FIX: Ensure UUID fields are never sent as empty strings ("")
       const safeVendorId = customerType === "subcontract" && vendorId ? vendorId : null;
       const safeContractId = contractId || null;
       const safeServiceLocationId = serviceLocationId || null;
@@ -507,8 +505,7 @@ export default function JobEditForm({
         job_type: jobType,
         service_type: serviceType.join(", "),
         billing_status: billingStatus,
-        invoice_number: invoiceNumber || null, // NEW FIELD
-        // Removed customer_type to prevent database error
+        invoice_number: invoiceNumber || null,
         ...(statusChanged && { status: status }),
         ...(scheduledChanged && { scheduled_start: isoScheduledStart }),
         return_trip_needed: returnTripNeeded,
@@ -519,31 +516,46 @@ export default function JobEditForm({
         updated_at: new Date().toISOString(),
       }
 
-      console.log("[v0] Updating job with data:", jobUpdateData)
-
+      // 1. UPDATE CORE DETAILS FIRST (So the calendar gets the freshest data)
       const { error: updateError } = await supabase.from("jobs").update(jobUpdateData).eq("id", jobId)
+      if (updateError) throw new Error(`Error updating job: ${updateError.message}`)
 
-      if (updateError) {
-        console.error("[v0] Error updating job:", updateError)
-        throw new Error(`Error updating job: ${updateError.message}`)
+      // 2. UPDATE LOCATIONS, EQUIPMENT, & CONTACTS
+      await supabase.from("job_service_locations").delete().eq("job_id", jobId)
+      const jobServiceLocationInserts = selectedSiteIds.map((siteId) => ({
+        job_id: jobId,
+        service_location_id: siteId,
+        site_notes: siteNotes[siteId] || null,
+      }))
+      if (jobServiceLocationInserts.length > 0) {
+        await supabase.from("job_service_locations").insert(jobServiceLocationInserts)
       }
 
-      // Remove technicians that are no longer assigned
-      const removedTechnicians = previousTechIds.filter((tid) => !newTechIds.includes(tid))
-      if (removedTechnicians.length > 0) {
-        const { error: deleteError } = await supabase
-          .from("job_technicians")
-          .delete()
-          .eq("job_id", jobId)
-          .in("technician_id", removedTechnicians)
-
-        if (deleteError) {
-          console.error("[v0] Error removing technicians:", deleteError)
-          throw new Error(`Error removing technicians: ${deleteError.message}`)
-        }
+      await supabase.from("job_equipment").delete().eq("job_id", jobId)
+      const jobEquipmentInserts = assignedUnits.map((unit) => ({
+        job_id: jobId,
+        equipment_id: unit.id,
+        service_location_id: unit.siteId,
+        unit_notes: unit.unitNotes || null,
+        expected_reports: 1,
+      }))
+      if (jobEquipmentInserts.length > 0) {
+        await supabase.from("job_equipment").insert(jobEquipmentInserts)
       }
 
-      // UPSERT existing/new technicians
+      await supabase.from("job_contacts").delete().eq("job_id", jobId)
+      const validContacts = contactsState.filter((c) => c.name.trim() || c.phone.trim() || c.email.trim())
+      if (validContacts.length > 0) {
+        const contactInserts = validContacts.map((contact) => ({
+          job_id: jobId,
+          name: contact.name,
+          phone: contact.phone,
+          email: contact.email || null,
+        }))
+        await supabase.from("job_contacts").insert(contactInserts)
+      }
+
+      // 3. UPSERT THE NEW TECHNICIANS (So the DB knows they exist before calling Google)
       if (selectedTechnicians.length > 0) {
         const technicianUpserts = selectedTechnicians.map((techId) => ({
           job_id: jobId,
@@ -557,68 +569,10 @@ export default function JobEditForm({
           onConflict: "job_id,technician_id",
           ignoreDuplicates: false,
         })
-
-        if (upsertError) {
-          console.error("[v0] Error upserting technicians:", upsertError)
-          throw new Error(`Error assigning technicians: ${upsertError.message}`)
-        }
+        if (upsertError) throw new Error(`Error assigning technicians: ${upsertError.message}`)
       }
 
-      // Update job service mappings
-      await supabase.from("job_service_locations").delete().eq("job_id", jobId)
-
-      const jobServiceLocationInserts = selectedSiteIds.map((siteId) => ({
-        job_id: jobId,
-        service_location_id: siteId,
-        site_notes: siteNotes[siteId] || null,
-      }))
-
-      if (jobServiceLocationInserts.length > 0) {
-        const { error: locationError } = await supabase.from("job_service_locations").insert(jobServiceLocationInserts)
-
-        if (locationError) {
-          console.error("[v0] Error updating job service locations:", locationError)
-          throw new Error("Failed to update job service locations")
-        }
-      }
-
-      // Update job_equipment
-      await supabase.from("job_equipment").delete().eq("job_id", jobId)
-
-      const jobEquipmentInserts = assignedUnits.map((unit) => ({
-        job_id: jobId,
-        equipment_id: unit.id,
-        service_location_id: unit.siteId,
-        unit_notes: unit.unitNotes || null,
-        expected_reports: 1,
-      }))
-
-      if (jobEquipmentInserts.length > 0) {
-        const { error: equipmentError } = await supabase.from("job_equipment").insert(jobEquipmentInserts)
-
-        if (equipmentError) {
-          console.error("Error updating job equipment:", equipmentError)
-          throw new Error("Failed to update job equipment")
-        }
-      }
-
-      // Update job_contacts
-      await supabase.from("job_contacts").delete().eq("job_id", jobId)
-      const validContacts = contactsState.filter((c) => c.name.trim() || c.phone.trim() || c.email.trim())
-      if (validContacts.length > 0) {
-        const contactInserts = validContacts.map((contact) => ({
-          job_id: jobId,
-          name: contact.name,
-          phone: contact.phone,
-          email: contact.email || null,
-        }))
-        const { error: contactError } = await supabase.from("job_contacts").insert(contactInserts)
-        if (contactError) {
-          console.error("[v0] Error updating contacts:", contactError)
-          throw new Error(`Error updating contacts: ${contactError.message}`)
-        }
-      }
-
+      // 4. TRIGGER THE CALENDAR API (It can now see BOTH the old and new engineers)
       console.log("[v0] Updating Google Calendar events...")
       try {
         const calendarResponse = await fetch("/api/calendar/update", {
@@ -626,7 +580,6 @@ export default function JobEditForm({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ jobId, technicianIds: selectedTechnicians, leadTechnicianId: leadTechnicianId }),
         })
-
         if (!calendarResponse.ok) {
           console.warn("[v0] Calendar update failed, but job was saved successfully")
         } else {
@@ -636,6 +589,19 @@ export default function JobEditForm({
         console.error("[v0] Error updating calendar:", calendarError)
       }
 
+      // 5. FINALLY, DELETE THE OLD TECHNICIANS FROM THE DATABASE
+      const removedTechnicians = previousTechIds.filter((tid) => !newTechIds.includes(tid))
+      if (removedTechnicians.length > 0) {
+        const { error: deleteError } = await supabase
+          .from("job_technicians")
+          .delete()
+          .eq("job_id", jobId)
+          .in("technician_id", removedTechnicians)
+
+        if (deleteError) throw new Error(`Error removing technicians: ${deleteError.message}`)
+      }
+
+      // 6. NOTIFICATIONS & REDIRECT
       if (changes.length > 0) {
         await createJobEditNotifications(jobId, jobTitle, changes, selectedTechnicians, job.organization_id)
       }
@@ -658,7 +624,7 @@ export default function JobEditForm({
       setLoading(false)
     }
   }
-
+  
   const availableUnits = filteredEquipment.filter((eq) => !assignedUnits.some((au) => au.id === eq.id))
 
   const searchFilteredUnits = availableUnits.filter(
