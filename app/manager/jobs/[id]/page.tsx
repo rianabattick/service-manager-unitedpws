@@ -471,6 +471,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
               jobId={id}
               initialNeeded={job.manager_return_trip_needed}
               initialReason={job.manager_return_trip_reason}
+              initialScheduled={(job as any).return_trip_scheduled}
             />
           )}
         </div>

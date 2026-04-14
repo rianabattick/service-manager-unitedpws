@@ -503,12 +503,15 @@ export async function listTechnicianJobsDetailed(technicianId: string): Promise<
 /**
  * Get jobs for manager jobs list page with lite details
  */
+/**
+ * Get jobs for manager jobs list page with lite details
+ */
 export async function listManagerJobsLite(params: {
   organizationId: string
   status?: string
   technicianId?: string
   customerId?: string
-  vendorId?: string // Added vendor filter parameter
+  vendorId?: string
   fromDate?: string
   toDate?: string
 }): Promise<
@@ -522,7 +525,8 @@ export async function listManagerJobsLite(params: {
     site_name: string | null
     technicians: Array<{ id: string; full_name: string }>
     unit_count: number
-    manager_return_trip_needed: boolean | null // Added manager return trip field for filtering
+    manager_return_trip_needed: boolean | null
+    return_trip_scheduled: boolean | null // 👈 Fixed the TypeScript definition here
   }>
 > {
   const supabase = await createClient()
@@ -537,6 +541,7 @@ export async function listManagerJobsLite(params: {
       status,
       scheduled_start,
       manager_return_trip_needed,
+      return_trip_scheduled,
       customer:customers!jobs_customer_id_fkey (
         id,
         first_name,
@@ -577,7 +582,7 @@ export async function listManagerJobsLite(params: {
 
   if (!jobs || jobs.length === 0) return []
 
-  const jobIds = jobs.map((j) => j.id)
+  const jobIds = jobs.map((j:any) => j.id)
 
   // Get technicians for each job
   const { data: jobTechs } = await supabase
@@ -596,7 +601,7 @@ export async function listManagerJobsLite(params: {
   if (params.technicianId) {
     const jobsWithTech =
       jobTechs?.filter((jt: any) => jt.technician?.id === params.technicianId).map((jt: any) => jt.job_id) || []
-    filteredJobs = jobs.filter((j) => jobsWithTech.includes(j.id))
+    filteredJobs = jobs.filter((j:any) => jobsWithTech.includes(j.id))
   }
 
   // Get equipment counts
@@ -628,7 +633,8 @@ export async function listManagerJobsLite(params: {
         full_name: t.technician?.full_name || "Unknown",
       })),
       unit_count: equipCount,
-      manager_return_trip_needed: job.manager_return_trip_needed ?? null, // Include manager return trip field
+      manager_return_trip_needed: job.manager_return_trip_needed ?? null,
+      return_trip_scheduled: job.return_trip_scheduled ?? false, // 👈 MAP IT TO THE RETURN OBJECT HERE
     }
   })
 }

@@ -4,74 +4,71 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Textarea } from "@/components/ui/textarea"
 import { useState } from "react"
-import { updateReturnTripDecision } from "./return-trip-actions" // Make sure path is correct
+import { updateReturnTripDecision } from "./return-trip-actions" 
 import { useToast } from "@/hooks/use-toast"
 
 interface ReturnTripManagerProps {
   jobId: string
   initialNeeded: boolean | null
   initialReason: string | null
+  initialScheduled?: boolean | null // 👈 NEW PROP
 }
 
-export function ReturnTripManager({ jobId, initialNeeded, initialReason }: ReturnTripManagerProps) {
+export function ReturnTripManager({ jobId, initialNeeded, initialReason, initialScheduled }: ReturnTripManagerProps) {
   const [needed, setNeeded] = useState<boolean | null>(initialNeeded)
   const [reason, setReason] = useState(initialReason || "")
+  const [scheduled, setScheduled] = useState<boolean>(!!initialScheduled) // 👈 NEW STATE
   const [isSaving, setIsSaving] = useState(false)
   const { toast } = useToast()
 
   const handleCheckChange = async (value: boolean) => {
-    // Toggle: if clicking the same value, uncheck it (set to null)
     const newValue = needed === value ? null : value
+    // If they change to 'No', automatically uncheck 'Scheduled'
+    const newScheduled = value === false ? false : scheduled
 
     setNeeded(newValue)
+    if (value === false) setScheduled(false)
+    
     setIsSaving(true)
-
-    // Pass the CURRENT 'reason' state
-    const result = await updateReturnTripDecision(jobId, newValue, reason)
-
+    const result = await updateReturnTripDecision(jobId, newValue, reason, newScheduled)
     setIsSaving(false)
 
     if (result.success) {
-      toast({
-        title: "Saved",
-        description: "Return trip decision updated",
-      })
+      toast({ title: "Saved", description: "Return trip decision updated" })
     } else {
-      toast({
-        title: "Error",
-        description: result.error || "Failed to save",
-        variant: "destructive",
-      })
-      // Revert on error
+      toast({ title: "Error", description: result.error || "Failed to save", variant: "destructive" })
       setNeeded(needed) 
     }
   }
 
-  // 1. Only update LOCAL state while typing (Instant, no lag)
   const handleReasonChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setReason(e.target.value)
   }
 
-  // 2. Save to Server ONLY when user clicks away
   const handleBlur = async () => {
-    // Optional: Prevent saving if nothing changed (optimization)
-    if (reason === initialReason && needed === initialNeeded) return
-
     setIsSaving(true)
-    const result = await updateReturnTripDecision(jobId, needed, reason)
+    const result = await updateReturnTripDecision(jobId, needed, reason, scheduled)
     setIsSaving(false)
 
     if (result.success) {
-      toast({
-        title: "Saved",
-        description: "Return trip reason updated",
-      })
+      toast({ title: "Saved", description: "Return trip reason updated" })
     } else {
-      toast({
-        title: "Error",
-        description: result.error || "Failed to save reason",
-        variant: "destructive",
-      })
+      toast({ title: "Error", description: result.error || "Failed to save reason", variant: "destructive" })
+    }
+  }
+
+  // 👈 NEW HANDLER FOR THE SCHEDULED CHECKBOX
+  const handleScheduledChange = async (checked: boolean) => {
+    setScheduled(checked)
+    setIsSaving(true)
+    const result = await updateReturnTripDecision(jobId, needed, reason, checked)
+    setIsSaving(false)
+
+    if (result.success) {
+      toast({ title: "Saved", description: checked ? "Marked as scheduled" : "Unmarked as scheduled" })
+    } else {
+      toast({ title: "Error", description: result.error || "Failed to save status", variant: "destructive" })
+      setScheduled(!checked)
     }
   }
 
@@ -84,7 +81,6 @@ export function ReturnTripManager({ jobId, initialNeeded, initialReason }: Retur
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {/* Checkboxes */}
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-2">
               <Checkbox
@@ -93,9 +89,7 @@ export function ReturnTripManager({ jobId, initialNeeded, initialReason }: Retur
                 onCheckedChange={() => handleCheckChange(false)}
                 disabled={isSaving}
               />
-              <label htmlFor="return-trip-no" className="text-sm font-medium cursor-pointer">
-                No
-              </label>
+              <label htmlFor="return-trip-no" className="text-sm font-medium cursor-pointer">No</label>
             </div>
 
             <div className="flex items-center gap-2">
@@ -105,32 +99,40 @@ export function ReturnTripManager({ jobId, initialNeeded, initialReason }: Retur
                 onCheckedChange={() => handleCheckChange(true)}
                 disabled={isSaving}
               />
-              <label htmlFor="return-trip-yes" className="text-sm font-medium cursor-pointer">
-                Yes
-              </label>
+              <label htmlFor="return-trip-yes" className="text-sm font-medium cursor-pointer">Yes</label>
             </div>
           </div>
 
-          {/* Reason textarea */}
           <div>
-            <label htmlFor="return-trip-reason" className="block text-sm font-medium mb-2">
-              Why?
-            </label>
+            <label htmlFor="return-trip-reason" className="block text-sm font-medium mb-2">Why?</label>
             <Textarea
               id="return-trip-reason"
               value={reason}
-              onChange={handleReasonChange} // 👈 Fast local update
-              onBlur={handleBlur}          // 👈 Save only when done
+              onChange={handleReasonChange}
+              onBlur={handleBlur}
               placeholder="Add context for why a return trip is / isn't needed…"
               className="min-h-[100px]"
               disabled={isSaving}
             />
             {showWarning && (
-              <p className="text-sm text-amber-600 dark:text-amber-400 mt-2">
-                Consider adding a reason when a return trip is needed
-              </p>
+              <p className="text-sm text-amber-600 mt-2">Consider adding a reason when a return trip is needed</p>
             )}
           </div>
+
+          {/* 👈 NEW SCHEDULED CHECKBOX UI */}
+          {needed === true && (
+            <div className="pt-4 mt-4 border-t flex items-center space-x-2">
+              <Checkbox
+                id="return-trip-scheduled"
+                checked={scheduled}
+                onCheckedChange={handleScheduledChange}
+                disabled={isSaving}
+              />
+              <label htmlFor="return-trip-scheduled" className="text-sm font-medium cursor-pointer">
+                Mark Return Trip as Scheduled
+              </label>
+            </div>
+          )}
 
           {needed === null && (
             <p className="text-sm text-muted-foreground">No decision made yet. Select Yes or No above.</p>

@@ -71,7 +71,9 @@ export default async function ManagerJobsPage({
     const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)
 
     if (viewMode === "return-trip") {
-      filteredJobs = jobs.filter((job) => job.manager_return_trip_needed === true)
+      filteredJobs = jobs.filter(
+        (job) => job.manager_return_trip_needed === true && job.return_trip_scheduled !== true
+      )
     } else if (viewMode === "overdue") {
       filteredJobs = jobs.filter(
         (job) =>

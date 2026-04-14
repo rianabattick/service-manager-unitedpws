@@ -21,7 +21,7 @@ export async function loadReturnTripDecision(jobId: string) {
     const { data, error } = await supabase
       .from("jobs")
       .select(
-        "manager_return_trip_needed, manager_return_trip_reason, manager_return_trip_updated_at, manager_return_trip_updated_by",
+        "manager_return_trip_needed, manager_return_trip_reason, manager_return_trip_updated_at, manager_return_trip_updated_by, return_trip_scheduled",
       )
       .eq("id", jobId)
       .eq("organization_id", user.organization_id)
@@ -39,7 +39,8 @@ export async function loadReturnTripDecision(jobId: string) {
   }
 }
 
-export async function updateReturnTripDecision(jobId: string, needed: boolean | null, reason: string) {
+// Notice the new 'scheduled' parameter added here!
+export async function updateReturnTripDecision(jobId: string, needed: boolean | null, reason: string, scheduled: boolean = false) {
   try {
     const user = await getCurrentUser()
 
@@ -58,6 +59,7 @@ export async function updateReturnTripDecision(jobId: string, needed: boolean | 
       .update({
         manager_return_trip_needed: needed,
         manager_return_trip_reason: reason || null,
+        return_trip_scheduled: scheduled, // Saving our new DB column
         manager_return_trip_updated_at: new Date().toISOString(),
         manager_return_trip_updated_by: user.id,
       })
