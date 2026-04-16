@@ -31,7 +31,8 @@ const SERVICE_OPTIONS = [
   "Site Evaluation",
   "Training",
   "Capacitor Upgrade",
-  "Installation",
+  "Battery Installation",
+  "Bypass Upgrade",
 ]
 
 interface JobEditFormProps {
