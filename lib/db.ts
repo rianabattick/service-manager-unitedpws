@@ -514,6 +514,7 @@ export async function listManagerJobsLite(params: {
   vendorId?: string
   fromDate?: string
   toDate?: string
+  viewMode?: string // 👈 Added viewMode so the DB knows what tab we are on
 }): Promise<
   Array<{
     id: string
@@ -526,7 +527,7 @@ export async function listManagerJobsLite(params: {
     technicians: Array<{ id: string; full_name: string }>
     unit_count: number
     manager_return_trip_needed: boolean | null
-    return_trip_scheduled: boolean | null // 👈 Fixed the TypeScript definition here
+    return_trip_scheduled: boolean | null
   }>
 > {
   const supabase = await createClient()
@@ -554,7 +555,7 @@ export async function listManagerJobsLite(params: {
     `)
     .eq("organization_id", params.organizationId)
 
-  // Apply filters
+  // Apply standard filters
   if (params.status) {
     query = query.eq("status", params.status)
   }
@@ -571,7 +572,23 @@ export async function listManagerJobsLite(params: {
     query = query.lte("scheduled_start", params.toDate)
   }
 
-  query = query.order("created_at", { ascending: false }).limit(100)
+  // --- NEW: Smart Database-Level Filtering & Limits ---
+  if (params.viewMode === "return-trip") {
+    // Tell the database to ONLY grab jobs flagged for return trips. 
+    // This ensures old jobs are never buried by new ones.
+    query = query.eq("manager_return_trip_needed", true)
+    query = query.limit(500) // Huge safety net for open return trips
+  } else if (params.viewMode === "completed") {
+    // Only grab completed jobs, limit to 100 to keep the app lightning fast
+    if (!params.status) query = query.eq("status", "completed")
+    query = query.limit(100) 
+  } else {
+    // Active and Overdue tabs: exclude completed/cancelled clutter to easily find old open jobs
+    if (!params.status) query = query.not("status", "in", '("completed","cancelled")')
+    query = query.limit(300)
+  }
+
+  query = query.order("created_at", { ascending: false })
 
   const { data: jobs, error: jobsError } = await query
 
@@ -634,7 +651,7 @@ export async function listManagerJobsLite(params: {
       })),
       unit_count: equipCount,
       manager_return_trip_needed: job.manager_return_trip_needed ?? null,
-      return_trip_scheduled: job.return_trip_scheduled ?? false, // 👈 MAP IT TO THE RETURN OBJECT HERE
+      return_trip_scheduled: job.return_trip_scheduled ?? false, 
     }
   })
 }

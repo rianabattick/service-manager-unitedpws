@@ -60,6 +60,7 @@ export default async function ManagerJobsPage({
     vendorId: params.vendor,
     fromDate: params.fromDate,
     toDate: params.toDate,
+    viewMode: viewMode, // 👈 ADD THIS SINGLE LINE!
   })
 
   let filteredJobs = jobs
