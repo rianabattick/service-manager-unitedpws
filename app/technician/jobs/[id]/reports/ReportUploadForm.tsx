@@ -26,65 +26,76 @@ export function ReportUploadForm({ jobId, equipmentId }: ReportUploadFormProps) 
     try {
       const form = e.currentTarget
       const fileInput = form.elements.namedItem("file") as HTMLInputElement
-      const file = fileInput?.files?.[0]
+      
+      // Convert the FileList object into a standard array
+      const files = Array.from(fileInput?.files || [])
 
-      if (!file) {
-        throw new Error("Please select a file")
+      if (files.length === 0) {
+        throw new Error("Please select at least one file")
       }
 
-      // Optional: size limit (50MB)
-      const maxSize = 50 * 1024 * 1024
-      if (file.size > maxSize) {
-        throw new Error("File size must be less than 50MB")
+      // Check the size limit for EVERY file before starting any uploads
+      const maxSize = 50 * 1024 * 1024 // 50MB
+      for (const file of files) {
+        if (file.size > maxSize) {
+          throw new Error(`File ${file.name} is too large. Must be less than 50MB.`)
+        }
       }
 
       const supabase = createClient()
 
-      const timestamp = Date.now()
-      const randomStr = Math.random().toString(36).substring(7)
+      // Map through all files and create an upload Promise for each one
+      const uploadPromises = files.map(async (file) => {
+        const timestamp = Date.now()
+        const randomStr = Math.random().toString(36).substring(7)
 
-      // Sanitize the original filename
-      const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_")
+        // Sanitize the original filename
+        const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_")
 
-      // Generate unique filename with timestamp prefix
-      const uniqueFileName = `${timestamp}-${randomStr}-${sanitizedFileName}`
-      const path = `${jobId}/${uniqueFileName}`
+        // Generate unique filename
+        const uniqueFileName = `${timestamp}-${randomStr}-${sanitizedFileName}`
+        const path = `${jobId}/${uniqueFileName}`
 
-      // 1) Upload file directly from the browser to Supabase Storage
-      const { data: uploadData, error: uploadError } = await supabase.storage.from("job-reports").upload(path, file, {
-        cacheControl: "3600",
-        upsert: false,
-        contentType: file.type || "application/octet-stream",
+        // 1) Upload file directly to Supabase Storage
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from("job-reports")
+          .upload(path, file, {
+            cacheControl: "3600",
+            upsert: false,
+            contentType: file.type || "application/octet-stream",
+          })
+
+        if (uploadError) {
+          console.error(`[v0] Storage upload error for ${file.name}:`, uploadError)
+          throw new Error(`Failed to upload ${file.name}: ${uploadError.message}`)
+        }
+
+        // 2) Get a public URL
+        const { data: urlData } = supabase.storage.from("job-reports").getPublicUrl(path)
+        const fileUrl = urlData.publicUrl
+
+        if (!fileUrl) {
+          throw new Error(`Failed to generate file URL for ${file.name}`)
+        }
+
+        // 3) Save metadata in job_attachments via server action
+        await saveReportMetadata(jobId, equipmentId, {
+          url: fileUrl,
+          name: file.name,
+          size: file.size,
+          type: file.type || "application/octet-stream",
+        })
       })
 
-      if (uploadError) {
-        console.error("[v0] Storage upload error:", uploadError)
-        throw new Error(uploadError.message || "Failed to upload file")
-      }
+      // Execute all uploads simultaneously!
+      await Promise.all(uploadPromises)
 
-      console.log("[v0] File uploaded to storage:", uploadData)
-
-      // 2) Get a public URL for the uploaded file
-      const { data: urlData } = supabase.storage.from("job-reports").getPublicUrl(path)
-      const fileUrl = urlData.publicUrl
-
-      if (!fileUrl) {
-        throw new Error("Failed to generate file URL")
-      }
-
-      // 3) Save metadata in job_attachments via server action
-      await saveReportMetadata(jobId, equipmentId, {
-        url: fileUrl,
-        name: file.name,
-        size: file.size,
-        type: file.type || "application/octet-stream",
-      })
-
-      // 4) Reset and refresh
+      // 4) Reset and refresh after EVERYTHING is done
       form.reset()
       setSelectedFileName(null)
       setUploading(false)
       window.location.reload()
+      
     } catch (err: any) {
       console.error("[v0] Upload error:", err)
       setError(err.message || "An unexpected error occurred while uploading")
@@ -93,8 +104,15 @@ export function ReportUploadForm({ jobId, equipmentId }: ReportUploadFormProps) 
   }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    setSelectedFileName(file ? file.name : null)
+    const files = e.target.files
+    if (!files || files.length === 0) {
+      setSelectedFileName(null)
+    } else if (files.length === 1) {
+      setSelectedFileName(files[0].name)
+    } else {
+      // If multiple files, display the total count
+      setSelectedFileName(`${files.length} files selected`)
+    }
   }
 
   return (
@@ -108,15 +126,17 @@ export function ReportUploadForm({ jobId, equipmentId }: ReportUploadFormProps) 
           disabled={uploading}
           onChange={handleFileChange}
           className="hidden"
+          // 👇 Added the multiple attribute right here!
+          multiple
           required
         />
         <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
-          Choose File
+          Choose Files
         </Button>
-        <span className="text-sm text-muted-foreground flex-1">{selectedFileName || "No file chosen"}</span>
+        <span className="text-sm text-muted-foreground flex-1">{selectedFileName || "No files chosen"}</span>
         <Button type="submit" disabled={uploading}>
           <Upload className="w-4 h-4 mr-2" />
-          {uploading ? "Uploading..." : "Upload Report"}
+          {uploading ? "Uploading..." : "Upload Reports"}
         </Button>
       </div>
       {error && <p className="text-sm text-destructive">{error}</p>}
