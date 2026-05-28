@@ -649,7 +649,7 @@ export default function JobEditForm({
           </Alert>
         )}
         {success && !error && (
-          <Alert variant="success">
+          <Alert variant="default">
             <AlertDescription>Job updated successfully!</AlertDescription>
           </Alert>
         )}
@@ -784,7 +784,7 @@ export default function JobEditForm({
                 <option value="">Select a contract...</option>
                 {filteredContracts.map((sa) => (
                   <option key={sa.id} value={sa.id}>
-                    {sa.agreement_number} - {sa.type}
+                    {sa.name || "Untitled Contract"}
                   </option>
                 ))}
               </select>
