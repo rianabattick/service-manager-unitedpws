@@ -96,8 +96,8 @@ export function ContractForm({
   const [notes, setNotes] = useState(contract?.notes || "")
   const [status, setStatus] = useState(contract?.status || "job_creation_needed")
   const [billingType, setBillingType] = useState(contract?.billing_type || "due_on_receipt")
-  const [services, setServices] = useState<Array<{ serviceType: "MJPM" | "MNPM"; frequencyMonths: number }>>(
-    contract?.services?.map((s) => ({ serviceType: s.service_type, frequencyMonths: s.frequency_months })) || [],
+  const [services, setServices] = useState<Array<{ serviceType: "MJPM" | "MNPM" | "Battery PM"; frequencyMonths: number }>>(
+    contract?.services?.map((s) => ({ serviceType: s.service_type as "MJPM" | "MNPM" | "Battery PM", frequencyMonths: s.frequency_months })) || [],
   )
 
   const totalPMsPerYear = services.reduce((sum, service) => sum + service.frequencyMonths, 0)
@@ -211,7 +211,7 @@ export function ContractForm({
           startDate,
           endDate,
           notes: notes,
-          services,
+          services: services as any,
           agreementLengthYears,
           pmDueNext: pmDueNext || undefined,
           unitInformation: unitInformation || undefined,
@@ -231,7 +231,7 @@ export function ContractForm({
           type: coveragePlan,
           startDate,
           endDate,
-          services,
+          services: services as any,
           notes: notes,
           createdBy: userId,
           agreementLengthYears,
@@ -417,14 +417,15 @@ export function ContractForm({
                 <div key={index} className="flex items-center gap-4 p-4 border border-border rounded-md">
                   <Select
                     value={service.serviceType}
-                    onValueChange={(val: "MJPM" | "MNPM") => updateService(index, "serviceType", val)}
+                    onValueChange={(val: "MJPM" | "MNPM" | "Battery PM") => updateService(index, "serviceType", val)}
                   >
-                    <SelectTrigger className="w-32">
+                    <SelectTrigger className="w-36">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="MJPM">MJPM</SelectItem>
                       <SelectItem value="MNPM">MNPM</SelectItem>
+                      <SelectItem value="Battery PM">Battery PM</SelectItem>
                     </SelectContent>
                   </Select>
                   <div className="flex items-center gap-2 ml-auto">

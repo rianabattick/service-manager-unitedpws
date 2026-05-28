@@ -7,7 +7,7 @@ import { ContractForm } from "../../ContractForm"
 export default async function EditContractPage({
   params,
 }: {
-  params: { id: string }
+  params: Promise<{ id: string }> // 👇 CHANGED: Wrapped in Promise
 }) {
   const user = await getCurrentUser()
 
@@ -19,7 +19,7 @@ export default async function EditContractPage({
     redirect("/login")
   }
 
-  const { id } = params
+  const { id } = await params // 👇 CHANGED: Added await
   const contract = await getContractDetail(id)
 
   if (!contract) {

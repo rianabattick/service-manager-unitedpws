@@ -35,7 +35,7 @@ export interface Contract {
 
 export interface ContractService {
   id: string
-  service_type: "MJPM" | "MNPM"
+  service_type: "MJPM" | "MNPM" | "Battery PM"
   frequency_months: number
 }
 
@@ -229,7 +229,7 @@ export async function createContract(params: {
   terms?: string
   billingFrequency?: string
   serviceFrequency?: string
-  services: Array<{ serviceType: "MJPM" | "MNPM"; frequencyMonths: number }>
+  services: Array<{ serviceType: "MJPM" | "MNPM" | "Battery PM"; frequencyMonths: number }>
   notes?: string
   createdBy: string
   agreementLengthYears?: number
@@ -340,7 +340,7 @@ export async function updateContract(
     serviceFrequency?: string
     notes?: string
     status?: string
-    services?: Array<{ serviceType: "MJPM" | "MNPM"; frequencyMonths: number }>
+    services?: Array<{ serviceType: "MJPM" | "MNPM" | "Battery PM"; frequencyMonths: number }>  //Change: Added Battery PM
     agreementLengthYears?: number
     pmDueNext?: string
     unitInformation?: string

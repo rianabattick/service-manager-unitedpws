@@ -41,7 +41,7 @@ export default async function ContractDetailPage({
     contract.jobs?.filter((j: any) => {
       if (j.status !== "completed") return false
       const serviceType = (j.service_type || "").toLowerCase()
-      return serviceType.includes("mjpm") || serviceType.includes("mnpm")
+      return serviceType.includes("mjpm") || serviceType.includes("mnpm") || serviceType.includes("battery pm")
     }).length || 0
 
   return (
