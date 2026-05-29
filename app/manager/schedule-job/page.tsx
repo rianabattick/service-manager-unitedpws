@@ -29,7 +29,8 @@ export default async function NewJobPage() {
       supabase
         .from("customers")
         .select("id, first_name, last_name, company_name")
-        .eq("organization_id", user.organization_id),
+        .eq("organization_id", user.organization_id)
+        .eq("is_active", true),
       supabase
         .from("service_locations")
         .select("id, customer_id, name, address, city, state")

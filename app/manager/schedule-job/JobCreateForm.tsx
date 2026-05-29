@@ -259,29 +259,36 @@ export function JobCreateForm({
   }
 
   const handleDeleteCompany = async (companyId: string) => {
-    if (!confirm("Are you sure you want to delete this company? This action cannot be undone.")) {
+    if (!confirm("Are you sure you want to remove this company?")) {
       return
     }
 
     try {
       const supabase = createClient()
-      const { error: deleteError } = await supabase.from("customers").delete().eq("id", companyId)
+      
+      // 👇 CHANGED: We use .update({ is_active: false }) instead of .delete()
+      const { error: deleteError } = await supabase
+        .from("customers")
+        .update({ is_active: false }) 
+        .eq("id", companyId)
 
       if (deleteError) throw deleteError
 
-      // Update local state
-      // Note: In a real app, you'd want to refetch data or use a state management solution.
-      customers.splice(
-        customers.findIndex((c) => c.id === companyId),
-        1,
-      )
+      // Update local state properly so React knows to re-render the dropdown
+      const index = customers.findIndex((c) => c.id === companyId)
+      if (index !== -1) {
+        customers.splice(index, 1)
+      }
+      
       if (customerId === companyId) {
         setCustomerId("")
       }
-      alert("Company deleted successfully")
+      
+      alert("Company removed successfully")
+      router.refresh() 
     } catch (err) {
-      console.error("[v0] Error deleting company:", err)
-      setError(err instanceof Error ? err.message : "Failed to delete company")
+      console.error("[v0] Error removing company:", err)
+      setError(err instanceof Error ? err.message : "Failed to remove company")
     }
   }
 
@@ -449,6 +456,7 @@ export function JobCreateForm({
       setNewCompanyCity("")
       setNewCompanyState("")
       setNewCompanyZipCode("")
+      router.refresh()
     } catch (err) {
       console.error("[v0] Error saving company:", err)
       setError(err instanceof Error ? err.message : "Failed to save company")
@@ -942,50 +950,66 @@ export function JobCreateForm({
             <Label htmlFor="customer">
               Company <span className="text-red-500">*</span>
             </Label>
-            <div className="flex gap-2">
-              <select
-                id="customer"
-                value={customerId}
-                onChange={(e) => {
-                  setCustomerId(e.target.value)
-                  // setServiceLocationId("") // Removed
-                  setSelectedEquipment([])
-                  setContractId("")
-                  setJobTitle("") // Clear job title when company changes
-                  setSelectedSiteIds([]) // Clear selected sites
-                  setSiteLocations({}) // Clear site locations
-                  // setSelectedSiteLocationIds({}) // Removed as it was undeclared
-                }}
-                className="flex-1 px-3 py-2 border border-input rounded-md bg-background"
-                required
-              >
-                <option value="">Select a company...</option>
-                {sortedCustomers.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.company_name || `${c.first_name || ""} ${c.last_name || ""}`.trim() || "Unknown"}
-                  </option>
-                ))}
-              </select>
-              <Button
-                type="button"
-                onClick={() => {
-                  setEditingCompanyId(null) // Ensure we are in add mode
-                  setShowAddCompany(true)
-                }}
-                variant="outline"
-              >
-                + Add
-              </Button>
-              {customerId && (
-                <>
-                  <Button type="button" onClick={() => handleEditCompany(customerId)} variant="outline" size="icon">
-                    <Pencil className="w-4 h-4" />
-                  </Button>
-                  <Button type="button" onClick={() => handleDeleteCompany(customerId)} variant="outline" size="icon">
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </>
-              )}
+            <div className="flex gap-2 w-full">
+              <div className="flex-1 min-w-0">
+                <select
+                  id="customer"
+                  value={customerId}
+                  onChange={(e) => {
+                    setCustomerId(e.target.value)
+                    setSelectedEquipment([])
+                    setContractId("")
+                    setJobTitle("") // Clear job title when company changes
+                    setSelectedSiteIds([]) // Clear selected sites
+                    setSiteLocations({}) // Clear site locations
+                  }}
+                  className="w-full px-3 py-2 border border-input rounded-md bg-background"
+                  required
+                >
+                  <option value="">Select a company...</option>
+                  {sortedCustomers.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.company_name || `${c.first_name || ""} ${c.last_name || ""}`.trim() || "Unknown"}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <Button
+                  type="button"
+                  onClick={() => {
+                    setEditingCompanyId(null) // Ensure we are in add mode
+                    setShowAddCompany(true)
+                  }}
+                  variant="outline"
+                  title="Add new company"
+                >
+                  + Add
+                </Button>
+                {customerId && (
+                  <>
+                    <Button 
+                      type="button" 
+                      onClick={() => handleEditCompany(customerId)} 
+                      variant="outline" 
+                      size="icon"
+                      title="Edit selected company"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </Button>
+                    <Button 
+                      type="button" 
+                      onClick={() => handleDeleteCompany(customerId)} 
+                      variant="outline" 
+                      size="icon"
+                      className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      title="Delete selected company"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
 
