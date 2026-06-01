@@ -29,6 +29,7 @@ export interface Contract {
   pm_due_next?: string
   unit_information?: string
   invoice_po_numbers?: string[] | null // 👇 ADDED THIS
+  is_bid_contract?: boolean // 👇 1. ADD THIS HERE
   created_at: string
   updated_at?: string
 }
@@ -49,6 +50,7 @@ export async function listContracts(params: {
   customerId?: string
   coveragePlan?: string
   viewMode?: "active" | "ended"
+  isBidContract?: string
 }): Promise<
   Array<Contract & { customer_name: string; coverage_plan?: string; services: ContractService[]; vendor_name?: string }>
 > {
@@ -93,6 +95,10 @@ export async function listContracts(params: {
 
   if (params.coveragePlan) {
     query = query.eq("type", params.coveragePlan)
+  }
+
+  if (params.isBidContract !== undefined && params.isBidContract !== "") {
+    query = query.eq("is_bid_contract", params.isBidContract === "true")
   }
 
   if (params.viewMode === "ended") {
@@ -238,6 +244,7 @@ export async function createContract(params: {
   status?: string // Added status parameter
   billingType?: string
   invoicePoNumbers?: string[] | null // 👇 CHANGED: Added | null
+  isBidContract?: boolean // 👇 2. ADD THIS HERE
 }) {
   const supabase = await createAdminClient()
 
@@ -275,6 +282,7 @@ export async function createContract(params: {
       unit_information: params.unitInformation || null,
       billing_type: params.billingType || "due_on_receipt",
       invoice_po_numbers: params.invoicePoNumbers || null, // 👇 ADDED THIS
+      is_bid_contract: params.isBidContract ?? false, // Changed || to ?? // 👇 3. ADD THIS HERE
     })
     .select()
     .single()
@@ -346,6 +354,7 @@ export async function updateContract(
     unitInformation?: string
     billingType?: string
     invoicePoNumbers?: string[] | null // 👇 CHANGED: Added | null
+    isBidContract?: boolean // 👇 4. ADD THIS HERE
   },
 ) {
   const supabase = await createAdminClient()
@@ -379,6 +388,7 @@ export async function updateContract(
   if (params.unitInformation !== undefined) updateData.unit_information = params.unitInformation
   if (params.billingType !== undefined) updateData.billing_type = params.billingType
   if (params.invoicePoNumbers !== undefined) updateData.invoice_po_numbers = params.invoicePoNumbers // 👇 ADDED THIS
+  if (params.isBidContract !== undefined) updateData.is_bid_contract = params.isBidContract // 👇 5. ADDED THIS 
 
   updateData.updated_at = new Date().toISOString()
 

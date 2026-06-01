@@ -116,6 +116,12 @@ export default async function ContractDetailPage({
                   <p className="text-sm capitalize font-medium">{contract.type?.replace(/_/g, " ") || "—"}</p>
                 </div>
                 <div>
+                  <span className="text-sm text-muted-foreground">Is Bid Contract</span>
+                  <p className="text-sm font-medium">
+                    {contract.is_bid_contract ? "Yes" : "No"}
+                  </p>
+                </div>
+                <div>
                   <span className="text-sm text-muted-foreground">Length of Agreement</span>
                   <p className="text-sm font-medium">
                     {contract.agreement_length_years || 1} year

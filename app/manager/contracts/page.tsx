@@ -17,6 +17,7 @@ interface SearchParams {
   coveragePlan?: string
   view?: "active" | "ended"
   page?: string
+  bidStatus?: string
 }
 
 export default async function ContractsPage({
@@ -82,6 +83,7 @@ export default async function ContractsPage({
     customerId: resolvedParams.customer,
     coveragePlan: resolvedParams.coveragePlan,
     viewMode,
+    isBidContract: resolvedParams.bidStatus,
   })
 
   const totalItems = contracts.length
@@ -192,7 +194,38 @@ export default async function ContractsPage({
                 ))}
               </select>
             </div>
-
+            
+            {/* Bid Contracts Filter */}
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium mb-2">
+                Bid Status
+              </label>
+              <div 
+                key={resolvedParams.bidStatus || "cleared"} 
+                className="flex items-center justify-center gap-6 w-full px-3 py-2 border border-input rounded-md bg-background"
+              >
+                <label className="flex items-center gap-2 cursor-pointer text-sm font-medium whitespace-nowrap">
+                  <input
+                    type="radio"
+                    name="bidStatus"
+                    value="true"
+                    defaultChecked={resolvedParams.bidStatus === "true"}
+                    className="w-4 h-4 text-primary"
+                  />
+                  Bid Contracts
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer text-sm font-medium whitespace-nowrap">
+                  <input
+                    type="radio"
+                    name="bidStatus"
+                    value="false"
+                    defaultChecked={resolvedParams.bidStatus === "false"}
+                    className="w-4 h-4 text-primary"
+                  />
+                  Non-bid Contracts
+                </label>
+              </div>
+            </div>
             {/* Submit Button */}
             <div className="flex items-end">
               <button
@@ -202,7 +235,6 @@ export default async function ContractsPage({
                 Apply Filters
               </button>
             </div>
-
             {/* Clear Filters */}
             <div className="flex items-end">
               <Link

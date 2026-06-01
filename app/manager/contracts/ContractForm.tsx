@@ -20,6 +20,7 @@ interface ContractFormProps {
     unit_information?: string; 
     pm_due_next?: string; 
     invoice_po_numbers?: string[]; // 👇 Added for TS
+    is_bid_contract?: boolean; // 👇 Added this line
   }
   customers: Array<{ id: string; name: string; company_name?: string; first_name?: string; last_name?: string }>
   organizationId: string
@@ -83,6 +84,7 @@ export function ContractForm({
   const [agreementLengthYears, setAgreementLengthYears] = useState(contract?.agreement_length_years || 1)
   const [startDate, setStartDate] = useState(contract?.start_date || "")
   const [endDate, setEndDate] = useState(contract?.end_date || "")
+  const [isBidContract, setIsBidContract] = useState<boolean | null>(contract?.is_bid_contract ?? null)
   
   // 👇 NEW: Dynamic array state for Invoices
   const [invoicePoNumbers, setInvoicePoNumbers] = useState<string[]>(
@@ -218,6 +220,7 @@ export function ContractForm({
           status,
           billingType,
           invoicePoNumbers: finalInvoices, // 👇 Updated mapping
+          isBidContract: isBidContract as boolean, // 👇 Added to update/create
         })
         console.log("[v0] Contract updated, redirecting to:", `/manager/contracts/${contract.id}`)
         window.location.href = `/manager/contracts/${contract.id}`
@@ -240,6 +243,7 @@ export function ContractForm({
           status,
           billingType,
           invoicePoNumbers: finalInvoices, // 👇 Updated mapping
+          isBidContract: isBidContract as boolean, // 👇 Added to update/create
         })
         console.log("[v0] Contract created successfully:", newContract.id)
         console.log("[v0] Redirecting to:", `/manager/contracts/${newContract.id}`)
@@ -369,6 +373,36 @@ export function ContractForm({
                 <SelectItem value="pseudo_gold">Pseudo Gold</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>
+              Is this a Bid Contract? <span className="text-red-500">*</span>
+            </Label>
+            <div className="flex items-center gap-4 pt-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="bidContract"
+                  checked={isBidContract === true}
+                  onChange={() => setIsBidContract(true)}
+                  className="w-4 h-4 text-primary"
+                  required
+                />
+                Yes
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="bidContract"
+                  checked={isBidContract === false}
+                  onChange={() => setIsBidContract(false)}
+                  className="w-4 h-4 text-primary"
+                  required
+                />
+                No
+              </label>
+            </div>
           </div>
 
           <div className="space-y-2">
