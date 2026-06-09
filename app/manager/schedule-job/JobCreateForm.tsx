@@ -665,6 +665,14 @@ export function JobCreateForm({
         return
       }
 
+      // 👇 NEW: Make sure they selected at least one unit
+      if (selectedEquipment.length === 0) {
+        alert("Please select at least one unit before creating the job")
+        setIsSubmitting(false)
+        return
+      }
+      // ☝️ END NEW BLOCK
+
       if (!jobTitle.trim()) {
         alert("Please enter a job title")
         setIsSubmitting(false)
@@ -1313,7 +1321,10 @@ export function JobCreateForm({
         {/* Units */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <Label>Units</Label>
+            {/* 👇 UPDATED: Added red asterisk */}
+            <Label>
+              Units <span className="text-red-500">*</span>
+            </Label>
             <Button
               type="button"
               onClick={() => {
