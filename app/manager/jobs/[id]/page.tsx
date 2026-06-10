@@ -220,10 +220,19 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
                   </div>
                 ) : null}
 
+                {/* 👇 COMPACT PO/WO ROW */}
                 <div>
-                  <span className="text-sm text-muted-foreground">PO# / WO#</span>
+                  <div className="flex items-center gap-3 mb-1">
+                    <span className="text-sm text-muted-foreground">PO# / WO#</span>
+                    <Link href={`/manager/jobs/${id}/purchase-orders`}>
+                      <Button variant="outline" size="sm" className="h-6 px-3 py-0 text-xs">
+                        Manage POs
+                      </Button>
+                    </Link>
+                  </div>
                   <p className="font-medium">{job.po_number || "—"}</p>
                 </div>
+                {/* ☝️ END COMPACT PO/WO ROW */}
 
                 <div>
                   <span className="text-sm text-muted-foreground">Estimate#</span>
