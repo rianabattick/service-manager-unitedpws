@@ -222,6 +222,7 @@ export interface JobDetail {
     billing_status: string | null
     return_trip_needed: boolean
     notes: string | null
+    tech_notes: string | null
     service_agreement_number: string | null
     po_number: string | null
     estimate_number: string | null

@@ -10,6 +10,7 @@ import { DeleteJobButton } from "./DeleteJobButton"
 import { CompletionChecklist } from "./CompletionChecklist"
 import { ReturnTripManager } from "./ReturnTripManager"
 import { ReadyToBillButton } from "@/components/ReadyToBillButton"
+import { JobNotesCard } from "@/components/JobNotesCard" // Adjust path if needed
 
 // Helper to format generic strings like "time_and_materials" -> "Time & Materials"
 function formatString(str: string | null) {
@@ -441,19 +442,13 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
           </Card>
 
           {/* Notes Section */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Notes</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {job.notes ? (
-                <p className="text-sm whitespace-pre-wrap">{job.notes}</p>
-              ) : (
-                <p className="text-muted-foreground text-sm">No notes added yet.</p>
-              )}
-            </CardContent>
-          </Card>
-
+          {/* Replace the old Notes Card with this: */}
+<JobNotesCard 
+  jobId={job.id} 
+  managerNotes={job.notes} 
+  initialTechNotes={job.tech_notes} 
+  userRole={user.role as any} 
+/>
           {isManager && (
             <CompletionChecklist
               jobId={id}

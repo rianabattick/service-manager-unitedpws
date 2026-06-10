@@ -5,6 +5,7 @@ import Link from "next/link"
 import { ArrowLeft, CheckCircle, CircleDashed } from "lucide-react" 
 import { getStatusColor, getTechnicianStatusColor } from "@/lib/utils"
 import { Button } from "@/components/ui/button" // 👈 Restored Button import
+import { JobNotesCard } from "@/components/JobNotesCard" // Adjust path if needed
 
 function formatString(str: string | null) {
   if (!str) return "Not set"
@@ -356,18 +357,12 @@ export default async function TechnicianJobDetailPage({ params }: { params: Prom
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Notes</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {job.notes ? (
-                <p className="text-sm whitespace-pre-wrap">{job.notes}</p>
-              ) : (
-                <p className="text-muted-foreground text-sm">No notes added yet.</p>
-              )}
-            </CardContent>
-          </Card>
+          <JobNotesCard 
+  jobId={job.id} 
+  managerNotes={job.notes} 
+  initialTechNotes={job.tech_notes} 
+  userRole="technician" 
+/>
         </div>
       </div>
     </div>
