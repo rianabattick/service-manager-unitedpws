@@ -88,6 +88,7 @@ const SERVICE_OPTIONS = [
   "Capacitor Upgrade", // Added "Capacitor Upgrade" to service options
   "Battery Installation", // Added "Installation" to service options
   "Bypass Upgrade", //Added Bypass Upgrade
+  "Firmware Upgrade", //Added Firmware Upgrade
 ]
 
 const JOB_TYPE_FIELD_OPTIONS = ["service_call", "installation", "maintenance", "inspection", "estimate", "warranty"]
