@@ -550,7 +550,10 @@ export async function listManagerJobsLite(params: {
         company_name
       ),
       location:service_locations!jobs_service_location_id_fkey (
-        name
+        name,
+        address,
+        city,
+        state
       )
     `)
     .eq("organization_id", params.organizationId)
@@ -613,6 +616,20 @@ export async function listManagerJobsLite(params: {
     `)
     .in("job_id", jobIds)
 
+  // 👇 NEW: Get sites from the correct Multi-Site linking table!
+  const { data: jobSites } = await supabase
+    .from("job_service_locations")
+    .select(`
+      job_id,
+      location:service_locations!job_service_locations_service_location_id_fkey (
+        name,
+        address,
+        city,
+        state
+      )
+    `)
+    .in("job_id", jobIds)
+
   // Apply technician filter if provided
   let filteredJobs = jobs
   if (params.technicianId) {
@@ -637,6 +654,18 @@ export async function listManagerJobsLite(params: {
       `${job.customer?.first_name || ""} ${job.customer?.last_name || ""}`.trim() ||
       "Unknown Customer"
 
+    // 👇 NEW: Look for the site in the multi-site table first, fallback to the legacy column
+    const sitesForThisJob = jobSites?.filter((js: any) => js.job_id === job.id) || [];
+    const primarySite = sitesForThisJob.length > 0 ? sitesForThisJob[0].location : job.location;
+
+    // Use name if it exists, otherwise build the address string
+    let siteDisplay = primarySite?.name;
+    if (!siteDisplay || siteDisplay.trim() === "") {
+      siteDisplay = [primarySite?.address, primarySite?.city, primarySite?.state]
+        .filter(Boolean)
+        .join(", ");
+    }
+
     return {
       id: job.id,
       job_number: job.job_number || job.id,
@@ -644,7 +673,7 @@ export async function listManagerJobsLite(params: {
       status: job.status || "draft",
       scheduled_date: job.scheduled_start,
       customer_name: customerName,
-      site_name: job.location?.name || null,
+      site_name: siteDisplay || null, 
       technicians: techs.map((t: any) => ({
         id: t.technician?.id || "",
         full_name: t.technician?.full_name || "Unknown",
@@ -655,7 +684,6 @@ export async function listManagerJobsLite(params: {
     }
   })
 }
-
 /**
  * Get complete job detail with all related data
  */
