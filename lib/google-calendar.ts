@@ -56,6 +56,7 @@ function buildEventDescription(job: any, equipmentList: any[], contacts: any[]) 
   
   let d = `JOB OVERVIEW\n${separator}\n\n`
   d += `Job Number: ${job.job_number}\n`
+  if (job.po_number) d += `PO# / WO#: ${job.po_number}\n`
   d += `Company: ${job.customer_name || "N/A"}\n`
   
   // Fix 1: Show Subcontract info correctly
