@@ -928,10 +928,28 @@ export default function JobEditForm({
 
           {/* Site Address(es) */}
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle>Site Address(es)</CardTitle>
+              <Button
+                type="button"
+                onClick={() => {
+                  setEditingSiteId(null)
+                  setNewSiteName("")
+                  setNewSiteAddress("")
+                  setNewSiteAddressLine2("")
+                  setNewSiteCity("")
+                  setNewSiteState("")
+                  setNewSiteZipCode("")
+                  setShowAddSite(true)
+                }}
+                variant="outline"
+                size="sm"
+                disabled={!customerId}
+              >
+                + Add Site
+              </Button>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 pt-4">
               <MultiSelectSite
                 sites={filteredLocations}
                 selectedSiteIds={selectedSiteIds}
@@ -1274,6 +1292,7 @@ export default function JobEditForm({
               onClick={async () => {
                 const supabase = createClient()
                 const siteData = {
+                  organization_id: organizationId,
                   name: newSiteName,
                   address: newSiteAddress,
                   address_line_2: newSiteAddressLine2,
