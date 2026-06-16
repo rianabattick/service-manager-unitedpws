@@ -3,7 +3,7 @@ import { getCurrentUser } from "@/lib/db"
 import { createClient } from "@/lib/supabase-server"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
-import { ArrowLeft, FileText, CheckCircle2, Clock } from "lucide-react" 
+import { ArrowLeft, FileText, CheckCircle2, Clock, Archive } from "lucide-react" 
 import { Button } from "@/components/ui/button"
 
 // 👇 ADDED: Import the upload form and report actions (adjust the path as needed to point to where these files are saved!)
@@ -159,7 +159,7 @@ export default async function ManagerReportsPage({ params }: { params: Promise<{
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {/* 👇 ADDED: Upload Form exactly as it is on the tech side */}
+                  {/* Upload Form exactly as it is on the tech side */}
                   <ReportUploadForm jobId={jobId} equipmentId={unit.equipment_id} />
 
                   {/* Existing Reports */}
@@ -169,31 +169,50 @@ export default async function ManagerReportsPage({ params }: { params: Promise<{
                     <div className="space-y-2 mt-2">
                       <h4 className="text-sm font-medium">Uploaded Reports</h4>
                       <div className="space-y-2">
-                        {unit.reports.map((report: any) => (
-                          <div 
-                            key={report.id} 
-                            className="flex flex-col sm:flex-row sm:items-center justify-between p-3 border rounded-lg gap-3"
-                          >
-                            <div className="flex items-center gap-3 overflow-hidden">
-                              <div className="p-2 bg-primary/10 rounded-md shrink-0">
-                                <FileText className="w-5 h-5 text-primary" />
-                              </div>
-                              
-                              <div className="min-w-0">
-                                <p className="text-sm font-medium truncate">{report.file_name}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  Uploaded by {report.uploader?.full_name || "Unknown"} on{" "}
-                                  {new Date(report.created_at).toLocaleString()}
-                                </p>
-                              </div>
-                            </div>
+                        {unit.reports.map((report: any) => {
+                          // 👇 NEW: Check if this report has been archived by the cron job
+                          const isArchived = report.file_url === "archived";
 
-                            {/* 👇 CHANGED: Replaced static Download button with ReportActions so they get the Delete option */}
-                            <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
-                              <ReportActions reportId={report.id} jobId={jobId} fileName={report.file_name} />
+                          return (
+                            <div 
+                              key={report.id} 
+                              className={`flex flex-col sm:flex-row sm:items-center justify-between p-3 border rounded-lg gap-3 ${
+                                isArchived ? "bg-muted/50 border-dashed" : ""
+                              }`}
+                            >
+                              <div className="flex items-center gap-3 overflow-hidden">
+                                <div className={`p-2 rounded-md shrink-0 ${isArchived ? "bg-muted" : "bg-primary/10"}`}>
+                                  {isArchived ? (
+                                    <Archive className="w-5 h-5 text-muted-foreground" />
+                                  ) : (
+                                    <FileText className="w-5 h-5 text-primary" />
+                                  )}
+                                </div>
+                                
+                                <div className="min-w-0">
+                                  <p className={`text-sm font-medium truncate ${isArchived ? "text-muted-foreground" : ""}`}>
+                                    {report.file_name}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    Uploaded by {report.uploader?.full_name || "Unknown"} on{" "}
+                                    {new Date(report.created_at).toLocaleString()}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                                {/* 👇 NEW: Show our message if archived, otherwise show the buttons */}
+                                {isArchived ? (
+                                  <span className="text-sm italic text-muted-foreground px-2 py-1 bg-muted rounded">
+                                    Report exported to public docs
+                                  </span>
+                                ) : (
+                                  <ReportActions reportId={report.id} jobId={jobId} fileName={report.file_name} />
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          )
+                        })}
                       </div>
                     </div>
                   )}

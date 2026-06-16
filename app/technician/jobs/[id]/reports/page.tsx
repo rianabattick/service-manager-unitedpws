@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase-server"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import { ArrowLeft, Download, CheckCircle, Clock, FileText } from "lucide-react"
+import { ArrowLeft, Download, CheckCircle, Clock, FileText, Archive } from "lucide-react"
 import { ReportUploadForm } from "./ReportUploadForm"
 import { ReportActions } from "./ReportActions"
 
@@ -60,7 +60,7 @@ export default async function TechnicianReportsPage({ params }: { params: Promis
     `)
     .eq("job_id", jobId)
 
-  // 2. Fetch Reports + Uploader Name (Using the relation string you provided)
+  // 2. Fetch Reports + Uploader Name + File Path
   const { data: attachments } = await supabase
     .from("job_attachments")
     .select(`
@@ -162,32 +162,53 @@ export default async function TechnicianReportsPage({ params }: { params: Promis
                   <div className="space-y-2">
                     <h4 className="text-sm font-medium">Uploaded Reports</h4>
                     <div className="space-y-2">
-                      {unit.reports.map((report: any) => (
-                        <div key={report.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 border rounded-lg gap-3">
-                           <div className="flex items-center gap-3 overflow-hidden">
-                              <div className="p-2 bg-primary/10 rounded-md shrink-0">
-                                <FileText className="w-5 h-5 text-primary" />
-                              </div>
-                              <div className="min-w-0">
-                                <p className="text-sm font-medium truncate">{report.file_name}</p>
-                                <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-xs text-muted-foreground">
-                                  <span>{new Date(report.created_at).toLocaleString()}</span>
-                                  {/* Show Uploader Name if available */}
-                                  {report.uploader?.full_name && (
-                                    <>
-                                      <span className="hidden sm:inline">•</span>
-                                      <span>Uploaded by {report.uploader.full_name}</span>
-                                    </>
+                      {unit.reports.map((report: any) => {
+                        const isArchived = report.file_url === "archived";
+
+                        return (
+                          <div 
+                            key={report.id} 
+                            className={`flex flex-col sm:flex-row sm:items-center justify-between p-3 border rounded-lg gap-3 ${
+                              isArchived ? "bg-muted/50 border-dashed" : ""
+                            }`}
+                          >
+                             <div className="flex items-center gap-3 overflow-hidden">
+                                <div className={`p-2 rounded-md shrink-0 ${isArchived ? "bg-muted" : "bg-primary/10"}`}>
+                                  {isArchived ? (
+                                    <Archive className="w-5 h-5 text-muted-foreground" />
+                                  ) : (
+                                    <FileText className="w-5 h-5 text-primary" />
                                   )}
                                 </div>
-                              </div>
-                           </div>
-                          
-                           <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
-  <ReportActions reportId={report.id} jobId={jobId} fileName={report.file_name} />
-</div>
-                        </div>
-                      ))}
+                                <div className="min-w-0">
+                                  <p className={`text-sm font-medium truncate ${isArchived ? "text-muted-foreground" : ""}`}>
+                                    {report.file_name}
+                                  </p>
+                                  <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-xs text-muted-foreground">
+                                    <span>{new Date(report.created_at).toLocaleString()}</span>
+                                    {/* Show Uploader Name if available */}
+                                    {report.uploader?.full_name && (
+                                      <>
+                                        <span className="hidden sm:inline">•</span>
+                                        <span>Uploaded by {report.uploader.full_name}</span>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                             </div>
+                            
+                             <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                               {isArchived ? (
+                                 <span className="text-sm italic text-muted-foreground px-2 py-1 bg-muted rounded">
+                                   Report exported to public docs
+                                 </span>
+                               ) : (
+                                 <ReportActions reportId={report.id} jobId={jobId} fileName={report.file_name} />
+                               )}
+                             </div>
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
                 )}

@@ -7,6 +7,10 @@
     {
       "path": "/api/jobs/check-overdue",
       "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/jobs/cleanup-reports",
+      "schedule": "0 2 * * *"
     }
   ]
 }
