@@ -52,6 +52,7 @@ export default async function ManagerNotificationsPage({
     .eq("organization_id", user.organization_id)
     .eq("recipient_user_id", user.id)
     .order("created_at", { ascending: false })
+    .limit(30) // <-- Limit UI amount of notifs shown to 30
 
   if (error) {
     console.error("[v0] Error fetching notifications:", error)

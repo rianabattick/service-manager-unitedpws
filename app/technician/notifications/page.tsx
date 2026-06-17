@@ -41,7 +41,8 @@ export default async function TechnicianNotificationsPage({
     .eq("organization_id", user.organization_id)
     .eq("recipient_user_id", user.id)
 
-  const totalPages = Math.ceil((count || 0) / ITEMS_PER_PAGE)
+  // Cap the total items for pagination at 30
+  const totalPages = Math.ceil(Math.min(count || 0, 30) / ITEMS_PER_PAGE)
 
   const { data: notifications, error } = await supabase
     .from("notifications")
@@ -49,7 +50,8 @@ export default async function TechnicianNotificationsPage({
     .eq("organization_id", user.organization_id)
     .eq("recipient_user_id", user.id)
     .order("created_at", { ascending: false })
-    .range(offset, offset + ITEMS_PER_PAGE - 1)
+    // Ensure the database stops fetching at the 30th item (index 29)
+    .range(offset, Math.min(offset + ITEMS_PER_PAGE - 1, 29))
 
   if (error) {
     console.error("[v0] Error fetching notifications:", error)
