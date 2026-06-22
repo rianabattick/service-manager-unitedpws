@@ -44,18 +44,22 @@ export default async function ManagerSchedulePage() {
       const start = job.scheduled_start
       const end = job.scheduled_end || new Date(new Date(job.scheduled_start).getTime() + 60 * 60 * 1000).toISOString()
 
-      let backgroundColor = "#3b82f6" // blue for default
-      let borderColor = "#2563eb"
+      // Default fallback just in case a status is missing
+      let backgroundColor = "#9ca3af" 
+      let borderColor = "#6b7280"
 
       if (job.status === "completed") {
-        backgroundColor = "#9ca3af" // gray for completed
-        borderColor = "#6b7280"
-      } else if (job.status === "cancelled") {
-        backgroundColor = "#ef4444" // red for cancelled
+        backgroundColor = "#10b981" // green for completed
+        borderColor = "#059669"
+      } else if (job.status === "overdue" || job.status === "cancelled") {
+        backgroundColor = "#ef4444" // red for overdue/cancelled
         borderColor = "#dc2626"
       } else if (job.status === "confirmed") {
-        backgroundColor = "#10b981" // green for confirmed
-        borderColor = "#059669"
+        backgroundColor = "#3b82f6" // blue for confirmed
+        borderColor = "#2563eb"
+      } else if (job.status === "pending") {
+        backgroundColor = "#fef08a" // light yellow for pending
+        borderColor = "#eab308"
       }
 
       return {
