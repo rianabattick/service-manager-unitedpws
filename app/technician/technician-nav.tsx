@@ -8,6 +8,7 @@ import { logout } from "@/app/actions/auth"
 const navItems = [
   { label: "Dashboard", href: "/technician" },
   { label: "My Jobs", href: "/technician/jobs" },
+  { label: "Reports", href: "/technician/templates" },
   { label: "Schedule", href: "/technician/schedule" },
 ]
 
