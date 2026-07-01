@@ -142,7 +142,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
 
       <div className="grid grid-cols-1 lg:grid-cols-[2fr_1.2fr] gap-6">
         {/* Left Column */}
-        <div className="space-y-6">
+        <div className="space-y-6 min-w-0">
           {/* Basic Info Section */}
           <Card>
             <CardHeader>
@@ -221,7 +221,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
                   </div>
                 ) : null}
 
-                {/* 👇 COMPACT PO/WO ROW */}
+                {/* 👇 RESTORED ORIGINAL PO/WO ROW */}
                 <div>
                   <div className="flex items-center gap-3 mb-1">
                     <span className="text-sm text-muted-foreground">PO# / WO#</span>
@@ -231,7 +231,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
                       </Button>
                     </Link>
                   </div>
-                  <p className="font-medium">{job.po_number || "—"}</p>
+                  <p className="font-medium break-words">{job.po_number || "—"}</p>
                 </div>
                 {/* ☝️ END COMPACT PO/WO ROW */}
 
@@ -376,7 +376,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
         </div>
 
         {/* Right Column */}
-        <div className="space-y-6">
+        <div className="space-y-6 min-w-0">
           
           {/* Units & Reports Section */}
           <Card>
